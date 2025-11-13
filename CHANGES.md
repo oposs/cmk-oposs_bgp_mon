@@ -12,8 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- build correct mkp
 
 ## 1.0.0 - 2025-11-13
+
 ### Changed
 - Ported to cmk api 2 and new plugin structures
 
