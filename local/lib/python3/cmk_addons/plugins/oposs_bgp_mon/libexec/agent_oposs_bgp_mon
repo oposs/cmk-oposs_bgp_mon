@@ -1,4 +1,4 @@
-#!/usr/bin/env python3	
+#!/usr/bin/env python3
 # Copyright (C) 2023 OETIIKER+PARTNER AG – License: GNU General Public License v2
 
 """
@@ -36,6 +36,11 @@ def parse_arguments(argv):
         "-r", "--driver", required=True, type=str, help="communication driver name"
     )
     parser.add_argument(
+        "--insecure",
+        action="store_true",
+        help="Disable SSL certificate verification (for self-signed certificates)"
+    )
+    parser.add_argument(
         "-d", "--debug", action="store_true", help="Debug mode: raise Python exceptions"
     )
     parser.add_argument(
@@ -68,11 +73,12 @@ def parse_arguments(argv):
 
 
 class ciscoFetcher:
-    def __init__(self, hostaddress, username, password, driver) -> None:  # type:ignore[no-untyped-def]
+    def __init__(self, hostaddress, username, password, driver, verify_ssl=True) -> None:  # type:ignore[no-untyped-def]
         self._username = username
         self._password = password
         self._host = hostaddress
         self._driver = driver
+        self._verify_ssl = verify_ssl
         self._endpoint = ( "http://%s/ins" if driver == 'cisco_http' else "https://%s/ins" ) % self._host
         self._headers = {"content-type": "application.json-rpc"}
 
@@ -105,7 +111,7 @@ class ciscoFetcher:
 
     def fetch(self):
         # if host is test and file is readable
-        if self._host == "test" and os.access("/tmp/cisco_bgp_data.json", os.R_OK):        
+        if self._host == "test" and os.access("/tmp/cisco_bgp_data.json", os.R_OK):
             with open("/tmp/cisco_bgp_data.json") as f:
                 return self.__postprocess(json.load(f))
 
@@ -124,7 +130,7 @@ class ciscoFetcher:
                     "id": 1,
                 }
             ),
-            verify=False,  # nosec
+            verify=self._verify_ssl,
         )
 
         if response.status_code != 200:
@@ -133,7 +139,7 @@ class ciscoFetcher:
             raise RuntimeError("Failed to fetch data")
         else:
             LOGGER.debug("success! response: %s", response.text)
-            
+
         try:
             return self.__postprocess(response.json())
         except Exception as e:
@@ -150,11 +156,11 @@ class ciscoFetcher:
         for vrf in data["result"]["body"]["TABLE_vrf"][
             "ROW_vrf"
         ]:
-            if ("TABLE_af" not in vrf 
+            if ("TABLE_af" not in vrf
                 or "ROW_af" not in vrf["TABLE_af"]):
                 continue
             for af in vrf["TABLE_af"]["ROW_af"]:
-                if ("TABLE_saf" not in af 
+                if ("TABLE_saf" not in af
                     or "ROW_saf" not in af["TABLE_saf"]):
                     continue
                 saf = af["TABLE_saf"]["ROW_saf"]
@@ -179,7 +185,7 @@ class ciscoFetcher:
                                 }
                             if "time" in neighbor:
                                 nb["uptime"] = self.__duration_string_to_seconds(neighbor["time"])
-                            result.append(nb)                        
+                            result.append(nb)
         return result
 
 class paloaltoFetcher:
@@ -187,13 +193,14 @@ class paloaltoFetcher:
         self._username = args.username
         self._password = args.password
         self._host = args.hostaddress
+        self._verify_ssl = not args.insecure
         self._endpoint = "https://%s/api/"  % self._host
         self._debug = args.debug
         self._verbose = args.verbose
 
     def fetch(self):
         # if host is test and file is readable
-        if self._host == "test" and os.access("/tmp/paloalto_bgp_data.xml", os.R_OK):        
+        if self._host == "test" and os.access("/tmp/paloalto_bgp_data.xml", os.R_OK):
             with open("/tmp/paloalto_bgp_data.xml") as f:
                 return self.__postprocess(f.read())
 
@@ -202,7 +209,7 @@ class paloaltoFetcher:
                 'user': self._username,
                 'password': self._password,
             },
-            verify=False,  # nosec
+            verify=self._verify_ssl,
         )
 
         if kg_response.status_code != 200:
@@ -213,13 +220,13 @@ class paloaltoFetcher:
             LOGGER.debug("success! response: %s", kg_response.text)
 
         kg_key = self.__getKey(kg_response.text)
-        
+
         op_response = requests.get(self._endpoint, {
                 'type': "op",
                 'key': kg_key,
                 'cmd': "<show><routing><protocol><bgp><peer></peer></bgp></protocol></routing></show>",
             },
-            verify=False,  # nosec
+            verify=self._verify_ssl,
         )
 
         if op_response.status_code != 200:
@@ -228,7 +235,7 @@ class paloaltoFetcher:
             raise RuntimeError("Failed to fetch bgp status")
         else:
             LOGGER.debug("success! response: %s", op_response.text)
-                    
+
         try:
             return self.__postprocess(op_response.text)
         except Exception as e:
@@ -248,7 +255,7 @@ class paloaltoFetcher:
         if key_element is not None:
             LOGGER.debug("Got auth key: %s",key_element.text)
             return key_element.text
- 
+
         LOGGER.warning("Failed to extract key from: %s");
         raise ValueError("Got no auth key")
 
@@ -269,10 +276,10 @@ class paloaltoFetcher:
             else:
                 af_name = prefix_entry.get('afi-safi')
                 neighbourid = entry.find('peer-group').text # not peer-router-id since this seems to be ip4 always
-                neighbouras = entry.find('peer-address').text 
+                neighbouras = entry.find('peer-address').text
                 state = entry.find('status').text
                 uptime = entry.find('status-duration').text
-                
+
                 result.append({
                     'vrf-name-out': vrf_name_out,
                     'af-name': af_name,
@@ -280,11 +287,11 @@ class paloaltoFetcher:
                     'neighbouras': neighbouras,
                     'state': state,
                     'uptime': int(uptime),
-                })  
+                })
         return result
 
 class huaweiFetcher:
-    # make sure to run 
+    # make sure to run
     #  pip3 install pexpect
     # in the checkmk instance where this plugin is installed
     import pexpect
@@ -296,7 +303,7 @@ class huaweiFetcher:
         self._host = args.hostaddress
         self._debug = args.debug
         self._verbose = args.verbose
-        
+
     def __more(self,cmd):
         # LOGGER.debug('sending: %s', cmd)
         self._child.sendline(cmd)
@@ -309,7 +316,7 @@ class huaweiFetcher:
             output += line
             if index == 0:
                 self._child.send(' ')
-        
+
         return re.sub(r"^.*\x1b\[42D","",output,flags=re.MULTILINE)
 
     def fetch(self):
@@ -411,11 +418,12 @@ class huaweiFetcher:
 def main(argv=None):
     replace_passwords()
     args = parse_arguments(argv or sys.argv[1:])
-    sys.stdout.write("<<<bgp_mon_sessions:sep(0)>>>\n")
+    sys.stdout.write("<<<oposs_bgp_mon_sessions:sep(0)>>>\n")
     try:
         if args.driver == "cisco_http" or args.driver == "cisco_https":
             for session in ciscoFetcher(
-                args.hostaddress, args.username, args.password,args.driver,
+                args.hostaddress, args.username, args.password, args.driver,
+                verify_ssl=not args.insecure,
             ).fetch():
                 # turn the session content into a single line json string
                 sys.stdout.write(json.dumps(session,sort_keys=True,separators=(',', ':')) + "\n")
