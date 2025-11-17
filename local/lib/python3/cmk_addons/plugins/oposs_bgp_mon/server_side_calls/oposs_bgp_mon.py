@@ -51,8 +51,9 @@ def generate_oposs_bgp_mon_command(
     if not verify_ssl:
         args.append("--insecure")
 
-    # Add host address as final argument
-    args.append(host_config.primary_ip_config.address)
+    # Add hostname as final argument
+    # Use hostname instead of IP for proper HTTPS/SSL certificate validation
+    args.append(host_config.name)
 
     yield SpecialAgentCommand(command_arguments=args)
 
