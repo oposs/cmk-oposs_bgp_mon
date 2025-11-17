@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
-- Agent now uses hostname instead of IP address for proper HTTPS/SSL certificate validation
-- Added `if __name__ == "__main__"` guard to agent plugin for proper module import behavior
 
 ### Fixed
+
+## 1.0.4 - 2025-11-17
+### Changed
+- Agent now uses hostname instead of IP address for proper HTTPS/SSL certificate validation
+- Added `if __name__ == "__main__"` guard to agent plugin for proper module import behavior
 
 ## 1.0.3 - 2025-11-17
 ### Fixed
