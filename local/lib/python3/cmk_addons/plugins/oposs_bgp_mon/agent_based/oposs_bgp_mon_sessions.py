@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from pprint import pprint
 from collections import namedtuple
 
-from cmk.utils import debug
+from cmk.ccc import debug
 from cmk.agent_based.v2 import AgentSection, CheckPlugin, Result, Metric, Service, State
 from cmk.agent_based.v2.type_defs import (
     CheckResult,

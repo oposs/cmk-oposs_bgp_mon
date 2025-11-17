@@ -294,7 +294,14 @@ class huaweiFetcher:
     # make sure to run
     #  pip3 install pexpect
     # in the checkmk instance where this plugin is installed
-    import pexpect
+    try:
+        import pexpect
+    except ImportError:
+        raise ImportError(
+            "The 'pexpect' library is required for Huawei devices but is not installed.\n"
+            "Please install it by running: pip3 install pexpect\n"
+            "If you are using an OMD site, run this command within the site context."
+        )
     timeout = 30
 
     def __init__(self, args) -> None:  # type:ignore[no-untyped-def]

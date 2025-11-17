@@ -10,8 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
+- Improved error message when pexpect library is missing for Huawei devices
 
 ### Fixed
+- Fixed import error: changed `from cmk.utils import debug` to `from cmk.ccc import debug` for Checkmk 2.4.0+ compatibility
 
 ## 1.0.1 - 2025-11-13
 ### Fixed
