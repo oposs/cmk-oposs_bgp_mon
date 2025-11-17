@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- Fixed import error: removed deprecated `cmk.agent_based.v2.type_defs` import, now importing types directly from `cmk.agent_based.v2` for Checkmk 2.4.0+ compatibility
 
 ## 1.0.2 - 2025-11-17
 ### Changed

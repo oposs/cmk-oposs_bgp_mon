@@ -7,17 +7,21 @@ from pprint import pprint
 from collections import namedtuple
 
 from cmk.ccc import debug
-from cmk.agent_based.v2 import AgentSection, CheckPlugin, Result, Metric, Service, State
-from cmk.agent_based.v2.type_defs import (
+from cmk.agent_based.v2 import (
+    AgentSection,
+    CheckPlugin,
     CheckResult,
     DiscoveryResult,
-    StringTable,
+    Metric,
+    Result,
+    Service,
+    State,
 )
 
 Section = Mapping[str, Any]
 
 
-def parse_oposs_bgp_mon_sessions(string_table: StringTable) -> Section:
+def parse_oposs_bgp_mon_sessions(string_table: list[list[str]]) -> Section:
     """Parse BGP session data from JSON format.
 
     Each line in string_table contains a JSON object with BGP session information:
