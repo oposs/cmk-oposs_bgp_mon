@@ -76,6 +76,7 @@ def _parameter_form() -> Dictionary:
                     ),
                     prefill=DefaultValue(True),
                 ),
+                required=True,
             ),
         },
     )
