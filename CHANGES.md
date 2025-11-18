@@ -10,10 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
-- require ssl verification setting
-- remove OETIKER+PARTNER from plugin name
 
 ### Fixed
+
+## 1.0.5 - 2025-11-18
+### Changed
+- require ssl verification setting
+- remove OETIKER+PARTNER from plugin name
 
 ## 1.0.4 - 2025-11-17
 ### Changed
