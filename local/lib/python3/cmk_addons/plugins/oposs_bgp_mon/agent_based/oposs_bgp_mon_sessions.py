@@ -72,7 +72,7 @@ def discover_sessions(section: Section) -> DiscoveryResult:
         yield Service(item=service)
 
 
-def check_oposs_bgp_mon_sessions(item: Any, section: Section) -> CheckResult:
+def check_oposs_bgp_mon_sessions(item: Any, params: Mapping[str, Any], section: Section) -> CheckResult:
     """Check BGP session state and report metrics.
 
     States:
@@ -124,13 +124,32 @@ def check_oposs_bgp_mon_sessions(item: Any, section: Section) -> CheckResult:
             value=float(result["uptime"]),
         )
 
-    # Evaluate session state
-    yield Result(
-        state=State.OK if session_status == 'established' else
-              State.CRIT if session_status == 'idle' else
-              State.WARN,
-        summary=f"state: {result.get('state', 'n/a')}",
-    )
+    # Evaluate session state with min_uptime check for established sessions
+    session_state = result.get('state', 'n/a')
+    uptime = result.get('uptime')
+
+    if session_status == 'established':
+        # Check minimum uptime thresholds (warn, crit) - uses LOWER direction
+        min_uptime = params.get('min_uptime')
+        if min_uptime is not None and uptime is not None:
+            warn_threshold, crit_threshold = min_uptime
+            if crit_threshold and uptime < crit_threshold:
+                yield Result(
+                    state=State.CRIT,
+                    summary=f"state: {session_state} (uptime {uptime:.0f}s < {crit_threshold:.0f}s critical threshold)",
+                )
+                return
+            elif warn_threshold and uptime < warn_threshold:
+                yield Result(
+                    state=State.WARN,
+                    summary=f"state: {session_state} (uptime {uptime:.0f}s < {warn_threshold:.0f}s warning threshold)",
+                )
+                return
+        yield Result(state=State.OK, summary=f"state: {session_state}")
+    elif session_status == 'idle':
+        yield Result(state=State.CRIT, summary=f"state: {session_state}")
+    else:
+        yield Result(state=State.WARN, summary=f"state: {session_state}")
 
 
 # v2 API: Class-based registration with entry point prefix
@@ -147,4 +166,6 @@ check_plugin_oposs_bgp_mon_sessions = CheckPlugin(
     sections=["oposs_bgp_mon_sessions"],
     discovery_function=discover_sessions,
     check_function=check_oposs_bgp_mon_sessions,
+    check_default_parameters={},
+    check_ruleset_name="oposs_bgp_mon_sessions",
 )

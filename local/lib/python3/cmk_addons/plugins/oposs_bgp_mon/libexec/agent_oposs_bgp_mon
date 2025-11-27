@@ -332,7 +332,7 @@ class huaweiFetcher:
                 return self.__postprocess(f.read())
         # Initiate SSH session
         self._child = child = self.pexpect.spawn(f"ssh {self._username}@{self._host}", encoding='utf-8')
-        password_prompt = ".*assword:"
+        password_prompt = ".*assword: "
         ssh_newkey = "Are you sure you want to continue connecting"
         output = ""
         try:

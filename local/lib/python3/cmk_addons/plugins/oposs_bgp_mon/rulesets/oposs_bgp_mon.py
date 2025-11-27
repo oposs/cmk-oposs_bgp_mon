@@ -6,13 +6,23 @@ from cmk.rulesets.v1.form_specs import (
     DefaultValue,
     DictElement,
     Dictionary,
+    InputHint,
+    LevelDirection,
+    SimpleLevels,
     SingleChoice,
     SingleChoiceElement,
     String,
     Password,
     BooleanChoice,
+    TimeMagnitude,
+    TimeSpan,
 )
-from cmk.rulesets.v1.rule_specs import SpecialAgent, Topic
+from cmk.rulesets.v1.rule_specs import (
+    CheckParameters,
+    HostAndItemCondition,
+    SpecialAgent,
+    Topic,
+)
 
 
 def _parameter_form() -> Dictionary:
@@ -87,4 +97,41 @@ rule_spec_special_agent_oposs_bgp_mon = SpecialAgent(
     title=Title("OETIKER+PARTNER BGP Monitor"),
     topic=Topic.NETWORKING,
     parameter_form=_parameter_form,
+)
+
+
+def _check_parameter_form() -> Dictionary:
+    return Dictionary(
+        title=Title("OPOSS BGP Monitor Session Parameters"),
+        elements={
+            "min_uptime": DictElement(
+                parameter_form=SimpleLevels[float](
+                    title=Title("Minimum uptime after recovery"),
+                    help_text=Help(
+                        "When a BGP session recovers to 'established' state, "
+                        "keep it in WARNING/CRITICAL state until it has been "
+                        "up for at least this duration. This helps detect "
+                        "flapping sessions."
+                    ),
+                    level_direction=LevelDirection.LOWER,
+                    form_spec_template=TimeSpan(
+                        displayed_magnitudes=[
+                            TimeMagnitude.MINUTE,
+                            TimeMagnitude.SECOND,
+                        ],
+                    ),
+                    prefill_fixed_levels=InputHint((60.0, 0.0)),
+                ),
+                required=False,
+            ),
+        },
+    )
+
+
+rule_spec_check_parameters_oposs_bgp_mon_sessions = CheckParameters(
+    name="oposs_bgp_mon_sessions",
+    title=Title("OPOSS BGP Monitor Sessions"),
+    topic=Topic.NETWORKING,
+    parameter_form=_check_parameter_form,
+    condition=HostAndItemCondition(item_title=Title("BGP Session")),
 )
