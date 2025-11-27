@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### New
+
+### Changed
+
+### Fixed
+
+## 1.1.0 - 2025-11-27
+### New
 - Added "minimum uptime after recovery" feature: configurable
   thresholds to keep recently-recovered BGP sessions in
   WARNING/CRITICAL state until stable (inspired by cisco_bgp_peer plugin)
@@ -15,8 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - When logging in via ssh wait for "assword: " and not just
   for "assword:"
-
-### Fixed
 
 ## 1.0.7 - 2025-11-19
 ### Changed
