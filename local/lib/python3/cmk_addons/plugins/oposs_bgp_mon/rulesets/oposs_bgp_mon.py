@@ -27,9 +27,9 @@ from cmk.rulesets.v1.rule_specs import (
 
 def _parameter_form() -> Dictionary:
     return Dictionary(
-        title=Title("OETIKER+PARTNER BGP Monitor"),
+        title=Title("OPOSS BGP Monitor"),
         help_text=Help(
-            "This rule configures the OETIKER+PARTNER BGP monitoring special agent "
+            "This rule configures the OPOSS BGP monitoring special agent "
             "which collects BGP session information from network devices. "
             "Supports Cisco Nexus 9000, Huawei Sx700, and Palo Alto Networks devices."
         ),
@@ -94,7 +94,7 @@ def _parameter_form() -> Dictionary:
 
 rule_spec_special_agent_oposs_bgp_mon = SpecialAgent(
     name="oposs_bgp_mon",
-    title=Title("OETIKER+PARTNER BGP Monitor"),
+    title=Title("OPOSS BGP Monitor"),
     topic=Topic.NETWORKING,
     parameter_form=_parameter_form,
 )
@@ -130,8 +130,8 @@ def _check_parameter_form() -> Dictionary:
 
 rule_spec_check_parameters_oposs_bgp_mon_sessions = CheckParameters(
     name="oposs_bgp_mon_sessions",
-    title=Title("OPOSS BGP Monitor Sessions"),
+    title=Title("OPOSS BGP Monitor Sessions Parameters"),
     topic=Topic.NETWORKING,
     parameter_form=_check_parameter_form,
-    condition=HostAndItemCondition(item_title=Title("BGP Session")),
+    condition=HostAndItemCondition(item_title=Title("OPOSS BGP Monitor Sessions Parameters")),
 )
