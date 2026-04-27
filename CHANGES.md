@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
+- `graphing/translations.py`: removed the dead `bgp_mon_sessions`
+  `PassiveCheck` key. Checkmk's translation lookup is an exact dict-key
+  match on the live service's current check command, so the legacy entry
+  never fired (no service has the legacy command after the old plugin is
+  uninstalled). The new `oposs_bgp_mon_sessions` key remains and continues
+  to handle the `uptime` → `oposs_bgp_mon_uptime` rename so legacy RRD
+  history merges into the new graph. Pure cleanup; no behaviour change.
 
 ### Fixed
 
