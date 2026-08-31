@@ -146,7 +146,7 @@ The Setup Screen (note: updated for v2 with SSL verification option)
 
 ## License
 
-GNU General Public License v2
+GNU General Public License v2 - OETIKER+PARTNER AG. See [LICENSE](LICENSE).
 
 ## Authors
 

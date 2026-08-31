@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
+- Licence is now GNU General Public License v2, matching the headers
+  the source files carry. The `LICENSE` file previously held the MIT
+  text, which contradicted them.
 
 ### Fixed
 
