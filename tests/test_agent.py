@@ -176,14 +176,11 @@ def test_cisco_garbage_raises_value_error(agent, monkeypatch):
 
 
 # NX-API returns a table with a single row as an object, not a one-element
-# list. The agent handles that for ROW_neighbor, but not for ROW_vrf or ROW_af,
-# so a switch with one BGP VRF fails with "Got invalid data from host".
+# list, at every level.
 SINGLE = _nxapi(_nxapi_vrf("default", {"af-id": "1", "TABLE_saf": {"ROW_saf": _nxapi_saf(
     "IPv4 Unicast", _nxapi_neighbor("10.0.0.2", "65001", "Established", "PT1H"))}}))
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="BUG: a single ROW_vrf or ROW_af comes as an object; the agent indexes its keys and fails the fetch")
 def test_cisco_single_vrf_and_af(agent, monkeypatch):
     monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(SINGLE)))
     sessions = agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()

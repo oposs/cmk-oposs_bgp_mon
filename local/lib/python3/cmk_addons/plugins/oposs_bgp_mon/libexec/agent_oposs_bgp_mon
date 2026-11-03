@@ -157,13 +157,18 @@ class ciscoFetcher:
         # consistant
         if ("bgp_parameters" in data):
             data = data["bgp_parameters"]["value"]
-        for vrf in data["result"]["body"]["TABLE_vrf"][
-            "ROW_vrf"
-        ]:
+        # NX-API sends a table with a single row as an object, not a list
+        vrfs = data["result"]["body"]["TABLE_vrf"]["ROW_vrf"]
+        if isinstance(vrfs, dict):
+            vrfs = [vrfs]
+        for vrf in vrfs:
             if ("TABLE_af" not in vrf
                 or "ROW_af" not in vrf["TABLE_af"]):
                 continue
-            for af in vrf["TABLE_af"]["ROW_af"]:
+            afs = vrf["TABLE_af"]["ROW_af"]
+            if isinstance(afs, dict):
+                afs = [afs]
+            for af in afs:
                 if ("TABLE_saf" not in af
                     or "ROW_saf" not in af["TABLE_saf"]):
                     continue

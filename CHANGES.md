@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whole section fail, so every "BGP AS..." service of the host went UNKNOWN
   with a crash report. Such a line now counts as a parse error, reported in
   the service "BGP _parse_errors", and the other sessions are checked.
+- On a Cisco Nexus switch with BGP in only one VRF, or only one address
+  family in a VRF, the special agent failed with "Got invalid data from host"
+  and no "BGP AS..." service was found. These sessions are now discovered and
+  checked.
 
 ## 1.1.3 - 2026-04-27
 ### Changed
