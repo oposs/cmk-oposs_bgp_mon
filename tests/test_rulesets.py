@@ -4,7 +4,6 @@ import importlib.util
 import pathlib
 import re
 import sys
-import types
 
 import pytest
 from cmk.rulesets.v1.form_specs import LevelDirection, SimpleLevels, SingleChoice
@@ -39,21 +38,7 @@ def ssc():
 
 @pytest.fixture(scope="module")
 def check():
-    # cmk.ccc.debug stand-in, see test_check.py
-    debug = types.ModuleType("cmk.ccc.debug")
-    debug.enabled = lambda: False
-    ccc = types.ModuleType("cmk.ccc")
-    ccc.debug = debug
-    saved = {k: sys.modules.get(k) for k in ("cmk.ccc", "cmk.ccc.debug")}
-    sys.modules.update({"cmk.ccc": ccc, "cmk.ccc.debug": debug})
-    try:
-        return _load(PLUGIN / "agent_based/oposs_bgp_mon_sessions.py", "test_oposs_bgp_mon_check_rs")
-    finally:
-        for key, value in saved.items():
-            if value is None:
-                sys.modules.pop(key, None)
-            else:
-                sys.modules[key] = value
+    return _load(PLUGIN / "agent_based/oposs_bgp_mon_sessions.py", "test_oposs_bgp_mon_check_rs")
 
 
 # --- special agent rule --------------------------------------------------------

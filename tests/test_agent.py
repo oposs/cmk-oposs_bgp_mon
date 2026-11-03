@@ -364,23 +364,10 @@ def _run_main(agent, argv, capsys):
 
 @pytest.fixture(scope="module")
 def check():
-    debug = types.ModuleType("cmk.ccc.debug")
-    debug.enabled = lambda: False
-    ccc = types.ModuleType("cmk.ccc")
-    ccc.debug = debug
-    saved = {k: sys.modules.get(k) for k in ("cmk.ccc", "cmk.ccc.debug")}
-    sys.modules.update({"cmk.ccc": ccc, "cmk.ccc.debug": debug})
-    try:
-        spec = importlib.util.spec_from_file_location("test_bgp_agent_check", CHECK)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module
-    finally:
-        for key, value in saved.items():
-            if value is None:
-                sys.modules.pop(key, None)
-            else:
-                sys.modules[key] = value
+    spec = importlib.util.spec_from_file_location("test_bgp_agent_check", CHECK)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_main_output_feeds_the_check(agent, check, monkeypatch, capsys):

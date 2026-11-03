@@ -6,13 +6,10 @@ written with sort_keys and compact separators, so every row of the string
 table holds exactly one JSON string.
 """
 
-import contextlib
 import importlib.util
 import json
 import pathlib
 import re
-import sys
-import types
 
 import pytest
 from cmk.agent_based.v2 import Metric, Result, Service, State
@@ -21,32 +18,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHECK = ROOT / "local/lib/python3/cmk_addons/plugins/oposs_bgp_mon/agent_based/oposs_bgp_mon_sessions.py"
 
 
-@contextlib.contextmanager
-def _ccc_stub():
-    """The check imports cmk.ccc.debug, which Checkmk 2.3 does not have (see
-    KNOWN_BROKEN in test_smoke.py). Lend it a stand-in here, and only here,
-    so the logic can be tested without hiding that bug from the smoke test."""
-    debug = types.ModuleType("cmk.ccc.debug")
-    debug.enabled = lambda: False
-    ccc = types.ModuleType("cmk.ccc")
-    ccc.debug = debug
-    saved = {k: sys.modules.get(k) for k in ("cmk.ccc", "cmk.ccc.debug")}
-    sys.modules.update({"cmk.ccc": ccc, "cmk.ccc.debug": debug})
-    try:
-        yield
-    finally:
-        for key, value in saved.items():
-            if value is None:
-                sys.modules.pop(key, None)
-            else:
-                sys.modules[key] = value
-
-
 def _load_check(path, name):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
-    with _ccc_stub():
-        spec.loader.exec_module(module)
+    spec.loader.exec_module(module)
     return module
 
 

@@ -29,23 +29,7 @@ def _module_name(path):
     return "cmk_smoke_" + path.relative_to(ROOT).as_posix().replace("/", "_")[:-3]
 
 
-# Modules known not to import against CMK_VERSION, with the reason. Each one
-# is a bug in the plugin, kept visible here until it is fixed; strict, so the
-# fix turns the run red until this entry goes.
-KNOWN_BROKEN = {
-    "local/lib/python3/cmk_addons/plugins/oposs_bgp_mon/agent_based/oposs_bgp_mon_sessions.py":
-        "BUG: imports cmk.ccc.debug, which no Checkmk 2.3 release has (2.4+ only)",
-}
-
-
-def _params():
-    for path in MODULES:
-        reason = KNOWN_BROKEN.get(path.relative_to(ROOT).as_posix())
-        marks = [pytest.mark.xfail(strict=True, raises=ImportError, reason=reason)] if reason else []
-        yield pytest.param(path, marks=marks, id=str(path.relative_to(ROOT)))
-
-
-@pytest.mark.parametrize("path", list(_params()))
+@pytest.mark.parametrize("path", MODULES, ids=lambda p: str(p.relative_to(ROOT)))
 def test_the_module_imports(path):
     name = _module_name(path)
     spec = importlib.util.spec_from_file_location(name, path)

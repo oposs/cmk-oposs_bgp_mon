@@ -24,12 +24,14 @@ import subprocess
 import sys
 
 # The Checkmk version this plugin targets. Raise it to find out what breaks.
-CMK_VERSION = "2.3.0"
+CMK_VERSION = "2.4.0"
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 CACHE = ROOT / ".cmk-api" / CMK_VERSION
-API_PACKAGES = ("cmk-agent-based", "cmk-graphing", "cmk-rulesets", "cmk-server-side-calls")
+# cmk-ccc became a package of its own in 2.4; the check imports cmk.ccc.debug
+API_PACKAGES = ("cmk-agent-based", "cmk-ccc", "cmk-graphing", "cmk-rulesets",
+                "cmk-server-side-calls")
 
 
 def _fetch_cmk_api(target):
