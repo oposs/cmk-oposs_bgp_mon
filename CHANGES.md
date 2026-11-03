@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The special agent carries the release version in `__version__`.
 
 ### Changed
+- Palo Alto sessions are named after the remote AS and the peer address,
+  for example "BGP AS65010 198.51.100.1" instead of
+  "BGP AS198.51.100.1:179 ISP", and their "neighbouras" and "neighbourid"
+  lines show these values. Run a service discovery: the old services vanish
+  with their uptime graphs, and the new ones appear.
 - The package now requires Checkmk 2.4.0p1 or later. On Checkmk 2.3 the
   BGP session check never loaded, so its services could not be discovered
   or checked there.
