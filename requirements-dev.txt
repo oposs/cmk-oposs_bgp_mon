@@ -6,5 +6,7 @@ pytest>=8
 # cmk-agent-based declares pydantic as a runtime dependency.
 pydantic>=2
 
-# Add whatever this plugin imports at runtime, e.g.:
-# requests>=2.31
+# The special agent talks HTTP(S) to Cisco and Palo Alto devices, and SSH
+# to Huawei devices through pexpect.
+requests>=2.31
+pexpect>=4.8
