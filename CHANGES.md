@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text, which contradicted them.
 
 ### Fixed
+- With "Minimum uptime after recovery" set in the rule "OPOSS BGP Monitor
+  Sessions Parameters", also to "No levels", every established "BGP AS..."
+  service went UNKNOWN with a crash report. These services now go WARN or CRIT
+  while the session has been up for less than the levels, and OK after that.
 
 ## 1.1.3 - 2026-04-27
 ### Changed
