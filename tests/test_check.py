@@ -63,7 +63,7 @@ def _worst(out):
 
 def test_parse_keys_sessions_by_as_and_neighbour(check):
     section = check.parse_oposs_bgp_mon_sessions(STRING_TABLE)
-    assert section.inventory == ["AS65001 10.0.0.2", "AS65002 10.0.0.3", "AS65003 10.2.2.2"]
+    assert section.inventory == ["AS65001 10.0.0.2", "AS65002 10.0.0.3", "AS65003 10.2.2.2 VRF vpn1"]
     assert section.result["AS65001 10.0.0.2"]["uptime"] == 93784
     assert section.errors == []
 
@@ -73,7 +73,7 @@ def test_discovery_one_service_per_session(check):
     assert list(check.discover_sessions(section)) == [
         Service(item="AS65001 10.0.0.2"),
         Service(item="AS65002 10.0.0.3"),
-        Service(item="AS65003 10.2.2.2"),
+        Service(item="AS65003 10.2.2.2 VRF vpn1"),
     ]
 
 
@@ -118,7 +118,7 @@ def test_idle_is_crit(check):
 
 
 def test_other_state_is_warn_and_null_uptime_gives_no_metric(check):
-    out = _check(check, "AS65003 10.2.2.2")
+    out = _check(check, "AS65003 10.2.2.2 VRF vpn1")
     assert _results(out)[-1] == Result(state=State.WARN, summary="state: Active")
     assert _metrics(out) == []
 
@@ -231,14 +231,22 @@ def test_json_that_is_not_an_object_is_a_parse_error(check, line):
     assert len(section.errors) == 1
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="BUG: sessions with the same AS and neighbour in two VRFs share one item; the last row hides the other")
 def test_same_peer_in_two_vrfs_is_checked_twice(check):
     blue = dict(CISCO_UP, **{"vrf-name-out": "blue"})
     red = dict(CISCO_UP, **{"vrf-name-out": "red"}, state="Idle")
-    section = check.parse_oposs_bgp_mon_sessions([_row(**red), _row(**blue)])
-    items = [s.item for s in check.discover_sessions(section)]
-    assert len(set(items)) == 2
+    table = [_row(**CISCO_UP), _row(**red), _row(**blue)]
+    section = check.parse_oposs_bgp_mon_sessions(table)
+    assert [s.item for s in check.discover_sessions(section)] == [
+        "AS65001 10.0.0.2", "AS65001 10.0.0.2 VRF red", "AS65001 10.0.0.2 VRF blue",
+    ]
+    assert _worst(_check(check, "AS65001 10.0.0.2 VRF red", table=table)) is State.CRIT
+    assert _worst(_check(check, "AS65001 10.0.0.2 VRF blue", table=table)) is State.OK
+
+
+@pytest.mark.parametrize("vrf", ["default", "????"])
+def test_default_vrf_keeps_the_old_item(check, vrf):
+    section = check.parse_oposs_bgp_mon_sessions([_row(**dict(CISCO_UP, **{"vrf-name-out": vrf}))])
+    assert section.inventory == ["AS65001 10.0.0.2"]
 
 
 # --- version -----------------------------------------------------------------
