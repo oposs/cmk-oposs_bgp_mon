@@ -342,10 +342,19 @@ def test_huawei_non_ascii_output(agent):
     assert len(_huawei_postprocess(agent, text)) == 3
 
 
-@pytest.mark.xfail(strict=True, raises=ImportError,
-                   reason="BUG: huaweiFetcher imports pexpect in its class body, so without pexpect no driver can run")
-def test_cisco_runs_without_pexpect():
-    _load_agent({"pexpect": None})
+def test_cisco_runs_without_pexpect(monkeypatch, capsys):
+    agent = _load_agent({"pexpect": None})
+    monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(NXAPI)))
+    code, lines = _run_main(agent, ["-u", "u", "-p", "p", "-r", "cisco_https", "router1"], capsys)
+    assert code == 0
+    assert len(lines) == 4
+
+
+def test_huawei_without_pexpect_says_what_to_install(monkeypatch):
+    agent = _load_agent()
+    monkeypatch.setitem(sys.modules, "pexpect", None)
+    with pytest.raises(ImportError, match="pip3 install pexpect"):
+        agent.huaweiFetcher(_args(agent, "huawei")).fetch()
 
 
 # --- main: what Checkmk reads ---------------------------------------------------
