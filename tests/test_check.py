@@ -6,9 +6,11 @@ written with sort_keys and compact separators, so every row of the string
 table holds exactly one JSON string.
 """
 
+import contextlib
 import importlib.util
 import json
 import pathlib
+import re
 import sys
 import types
 
@@ -19,31 +21,38 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CHECK = ROOT / "local/lib/python3/cmk_addons/plugins/oposs_bgp_mon/agent_based/oposs_bgp_mon_sessions.py"
 
 
-@pytest.fixture(scope="module")
-def check():
-    # The check imports cmk.ccc.debug, which Checkmk 2.3 does not have (see
-    # KNOWN_BROKEN in test_smoke.py). Lend it a stand-in here, and only here,
-    # so the logic can be tested without hiding that bug from the smoke test.
+@contextlib.contextmanager
+def _ccc_stub():
+    """The check imports cmk.ccc.debug, which Checkmk 2.3 does not have (see
+    KNOWN_BROKEN in test_smoke.py). Lend it a stand-in here, and only here,
+    so the logic can be tested without hiding that bug from the smoke test."""
     debug = types.ModuleType("cmk.ccc.debug")
     debug.enabled = lambda: False
     ccc = types.ModuleType("cmk.ccc")
     ccc.debug = debug
     saved = {k: sys.modules.get(k) for k in ("cmk.ccc", "cmk.ccc.debug")}
     sys.modules.update({"cmk.ccc": ccc, "cmk.ccc.debug": debug})
-    name = "test_oposs_bgp_mon_sessions_check"
-    spec = importlib.util.spec_from_file_location(name, CHECK)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
     try:
-        spec.loader.exec_module(module)
-        yield module
+        yield
     finally:
-        sys.modules.pop(name, None)
         for key, value in saved.items():
             if value is None:
                 sys.modules.pop(key, None)
             else:
                 sys.modules[key] = value
+
+
+def _load_check(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    with _ccc_stub():
+        spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture(scope="module")
+def check():
+    return _load_check(CHECK, "test_oposs_bgp_mon_sessions_check")
 
 
 def _row(**session):
@@ -255,3 +264,19 @@ def test_same_peer_in_two_vrfs_is_checked_twice(check):
     section = check.parse_oposs_bgp_mon_sessions([_row(**red), _row(**blue)])
     items = [s.item for s in check.discover_sessions(section)]
     assert len(set(items)) == 2
+
+
+# --- version -----------------------------------------------------------------
+
+
+def test_release_writes_version_into_check(tmp_path):
+    """Apply the version_files entry of .github/repo-infra.json to the check
+    module, as Create release PR does (a multiline regex, first match)"""
+    config = json.loads((ROOT / ".github/repo-infra.json").read_text())
+    (spec,) = [f for f in config["version_files"] if (ROOT / f["path"]) == CHECK]
+    stamped = re.sub(spec["pattern"], spec["replacement"].replace("$VERSION", "9.8.7"),
+                     CHECK.read_text(), count=1, flags=re.MULTILINE)
+    assert re.search(spec["verify"].replace("$VERSION", re.escape("9.8.7")), stamped, flags=re.MULTILINE)
+    copy = tmp_path / "stamped_check.py"
+    copy.write_text(stamped)
+    assert _load_check(copy, "stamped_check").__version__ == "9.8.7"

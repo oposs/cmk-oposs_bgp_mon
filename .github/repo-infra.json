@@ -6,6 +6,12 @@
       "pattern": "^__version__ = \"[^\"]*\"",
       "replacement": "__version__ = \"$VERSION\"",
       "verify": "^__version__ = \"$VERSION\""
+    },
+    {
+      "path": "local/lib/python3/cmk_addons/plugins/oposs_bgp_mon/agent_based/oposs_bgp_mon_sessions.py",
+      "pattern": "^__version__ = \"[^\"]*\"",
+      "replacement": "__version__ = \"$VERSION\"",
+      "verify": "^__version__ = \"$VERSION\""
     }
   ],
   "release_assets": [

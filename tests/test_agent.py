@@ -9,6 +9,7 @@ over SSH for Huawei. No network or SSH is used; requests is patched.
 import importlib.util
 import json
 import pathlib
+import re
 import sys
 import types
 from importlib.machinery import SourceFileLoader
@@ -25,7 +26,7 @@ CHECK = PLUGIN / "agent_based/oposs_bgp_mon_sessions.py"
 DST = 3600
 
 
-def _load_agent(extra_modules=None):
+def _load_agent(extra_modules=None, path=AGENT):
     """Load the agent with the one monolith module it needs stubbed.
 
     cmk.utils.password_store exists only inside a Checkmk site. The stub is
@@ -41,7 +42,7 @@ def _load_agent(extra_modules=None):
     saved = {k: sys.modules.get(k) for k in stubs}
     sys.modules.update(stubs)
     try:
-        loader = SourceFileLoader("agent_oposs_bgp_mon", str(AGENT))
+        loader = SourceFileLoader("agent_oposs_bgp_mon", str(path))
         spec = importlib.util.spec_from_loader(loader.name, loader)
         module = importlib.util.module_from_spec(spec)
         loader.exec_module(module)
@@ -410,3 +411,19 @@ def test_main_unknown_driver(agent, capsys):
     code, lines = _run_main(agent, ["-u", "u", "-p", "p", "-r", "juniper", "router1"], capsys)
     assert code == 1
     assert lines[-1] == "Error: Unknown driver"
+
+
+# --- version -----------------------------------------------------------------
+
+
+def test_release_writes_version_into_agent(tmp_path):
+    """Apply the version_files entry of .github/repo-infra.json to the agent,
+    as Create release PR does (a multiline regex, first match)"""
+    config = json.loads((ROOT / ".github/repo-infra.json").read_text())
+    (spec,) = [f for f in config["version_files"] if (ROOT / f["path"]) == AGENT]
+    stamped = re.sub(spec["pattern"], spec["replacement"].replace("$VERSION", "9.8.7"),
+                     AGENT.read_text(), count=1, flags=re.MULTILINE)
+    assert re.search(spec["verify"].replace("$VERSION", re.escape("9.8.7")), stamped, flags=re.MULTILINE)
+    copy = tmp_path / "agent_oposs_bgp_mon"
+    copy.write_text(stamped)
+    assert _load_agent(path=copy).__version__ == "9.8.7"
