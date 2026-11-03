@@ -1,12 +1,11 @@
-#!/usr/bin/env python3
 # Copyright (C) 2023 OETIKER+PARTNER AG – License: GNU General Public License v2
 
 import json
-from typing import Any, Mapping
-from pprint import pprint
 from collections import namedtuple
+from collections.abc import Mapping
+from pprint import pprint
+from typing import Any
 
-from cmk.ccc import debug
 from cmk.agent_based.v2 import (
     AgentSection,
     CheckPlugin,
@@ -17,6 +16,7 @@ from cmk.agent_based.v2 import (
     Service,
     State,
 )
+from cmk.ccc import debug
 
 Section = Mapping[str, Any]
 

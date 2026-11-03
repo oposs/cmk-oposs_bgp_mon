@@ -1,19 +1,18 @@
-#!/usr/bin/env python3
 # Copyright (C) 2023 OETIKER+PARTNER AG – License: GNU General Public License v2
 
 from cmk.rulesets.v1 import Help, Label, Title
 from cmk.rulesets.v1.form_specs import (
+    BooleanChoice,
     DefaultValue,
     DictElement,
     Dictionary,
     InputHint,
     LevelDirection,
+    Password,
     SimpleLevels,
     SingleChoice,
     SingleChoiceElement,
     String,
-    Password,
-    BooleanChoice,
     TimeMagnitude,
     TimeSpan,
 )

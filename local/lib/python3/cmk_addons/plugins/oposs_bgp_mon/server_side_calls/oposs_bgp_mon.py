@@ -1,12 +1,14 @@
-#!/usr/bin/env python3
 # Copyright (C) 2023 OETIKER+PARTNER AG – License: GNU General Public License v2
 
 from collections.abc import Iterator
-from typing import Any
 
+from cmk.server_side_calls.v1 import (
+    HostConfig,
+    Secret,
+    SpecialAgentCommand,
+    SpecialAgentConfig,
+)
 from pydantic import BaseModel
-
-from cmk.server_side_calls.v1 import HostConfig, Secret, SpecialAgentCommand, SpecialAgentConfig
 
 
 class Params(BaseModel):
