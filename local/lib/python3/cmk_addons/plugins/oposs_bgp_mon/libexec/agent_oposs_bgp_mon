@@ -401,7 +401,7 @@ class huaweiFetcher:
 
     def __postprocess(self, data):
         LOGGER.debug("Got data for postprocessing (%i bytes)", len(data))
-        LOGGER.debug("DATA ============================\n%s", base64.encodebytes(data.encode('ascii')).decode('utf-8'))
+        LOGGER.debug("DATA ============================\n%s", base64.encodebytes(data.encode('utf-8')).decode('utf-8'))
         result = []
         pattern = r"""
             (family\sfor\sVPN\sinstance:\s+(?P<vrf_name_out>\S+))?\s+

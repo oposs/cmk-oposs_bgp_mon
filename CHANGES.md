@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   family in a VRF, the special agent failed with "Got invalid data from host"
   and no "BGP AS..." service was found. These sessions are now discovered and
   checked.
+- On a Huawei switch whose BGP output held a character outside ASCII, for
+  example an umlaut in a peer description, the special agent failed with "Got
+  invalid data from host" and none of its "BGP AS..." services was checked.
+  Such output is now read.
 
 ## 1.1.3 - 2026-04-27
 ### Changed

@@ -337,8 +337,6 @@ def test_huawei_no_peers(agent):
     assert _huawei_postprocess(agent, "Info: No peer.\n") == []
 
 
-@pytest.mark.xfail(strict=True, raises=UnicodeEncodeError,
-                   reason="BUG: the debug log line base64-encodes the output as ASCII on every run; any non-ASCII byte fails the fetch")
 def test_huawei_non_ascii_output(agent):
     text = HUAWEI.replace("Type: EBGP link", "Peer's description: \"Zürich POP\"\n         Type: EBGP link")
     assert len(_huawei_postprocess(agent, text)) == 3
