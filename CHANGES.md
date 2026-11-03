@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### New
+- The special agent `agent_oposs_bgp_mon` carries the release version in
+  `__version__`.
 
 ### Changed
 - Licence is now GNU General Public License v2, matching the headers

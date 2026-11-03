@@ -1,0 +1,14 @@
+{
+  "moving_major_tag": false,
+  "version_files": [
+    {
+      "path": "local/lib/python3/cmk_addons/plugins/oposs_bgp_mon/libexec/agent_oposs_bgp_mon",
+      "pattern": "^__version__ = \"[^\"]*\"",
+      "replacement": "__version__ = \"$VERSION\"",
+      "verify": "^__version__ = \"$VERSION\""
+    }
+  ],
+  "release_assets": [
+    "oposs_bgp_mon-*.mkp"
+  ]
+}
