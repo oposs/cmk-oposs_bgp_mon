@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Sessions Parameters", also to "No levels", every established "BGP AS..."
   service went UNKNOWN with a crash report. These services now go WARN or CRIT
   while the session has been up for less than the levels, and OK after that.
+- An agent output line that was valid JSON but not a session record made the
+  whole section fail, so every "BGP AS..." service of the host went UNKNOWN
+  with a crash report. Such a line now counts as a parse error, reported in
+  the service "BGP _parse_errors", and the other sessions are checked.
 
 ## 1.1.3 - 2026-04-27
 ### Changed

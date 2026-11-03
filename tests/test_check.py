@@ -222,8 +222,6 @@ def test_parse_error_service_ok_once_errors_are_gone(check):
 
 
 @pytest.mark.parametrize("line", ["null", "[1, 2]", '"text"', "42"])
-@pytest.mark.xfail(strict=True, raises=TypeError,
-                   reason="BUG: a row that is valid JSON but not an object raises TypeError, which parse does not catch")
 def test_json_that_is_not_an_object_is_a_parse_error(check, line):
     section = check.parse_oposs_bgp_mon_sessions([_row(**CISCO_UP), [line]])
     assert section.inventory == ["AS65001 10.0.0.2"]

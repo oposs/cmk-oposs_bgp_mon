@@ -45,7 +45,7 @@ def parse_oposs_bgp_mon_sessions(string_table: list[list[str]]) -> Section:
             service = 'AS' + data['neighbouras'] + ' ' + data['neighbourid']
             parsed.inventory.append(service)
             parsed.result[service] = data
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
             error_msg = f"Failed to parse BGP session data: {e}"
             parsed.errors.append(error_msg)
             if debug.enabled():
