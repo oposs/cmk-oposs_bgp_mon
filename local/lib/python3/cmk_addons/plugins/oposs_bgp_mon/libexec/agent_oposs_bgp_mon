@@ -5,6 +5,10 @@
 Special agent for monitoring bgp Sessions with Check_MK.
 """
 
+# Create release PR writes the released version here (version_files in
+# .github/repo-infra.json)
+__version__ = "unreleased"
+
 import argparse
 import logging
 import sys

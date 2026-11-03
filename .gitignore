@@ -6,6 +6,9 @@
 !/.gitignore
 !/.github
 !/.mkp-builder.ini
+!/tests
+!/pytest.ini
+!/requirements-dev.txt
 *~
 *.swp
 *.bak

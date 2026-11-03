@@ -8,8 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### New
+- The package carries the release version in its check plugin (`__version__`).
+- The special agent carries the release version in `__version__`.
 
 ### Changed
+- The package now requires Checkmk 2.4.0p1 or later. On Checkmk 2.3 the
+  BGP session check never loaded, so its services could not be discovered
+  or checked there.
 - Licence is now GNU General Public License v2, matching the headers
   the source files carry. The `LICENSE` file previously held the MIT
   text, which contradicted them.
