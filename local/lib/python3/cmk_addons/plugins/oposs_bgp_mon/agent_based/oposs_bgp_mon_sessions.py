@@ -51,7 +51,7 @@ def parse_oposs_bgp_mon_sessions(string_table: list[list[str]]) -> Section:
                 service += ' VRF ' + vrf
             parsed.inventory.append(service)
             parsed.result[service] = data
-        except (json.JSONDecodeError, KeyError, IndexError) as e:
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
             error_msg = f"Failed to parse BGP session data: {e}"
             parsed.errors.append(error_msg)
             if debug.enabled():
@@ -140,10 +140,12 @@ def check_oposs_bgp_mon_sessions(item: Any, params: Mapping[str, Any], section: 
     uptime = result.get('uptime')
 
     if session_status == 'established':
-        # Check minimum uptime thresholds (warn, crit) - uses LOWER direction
+        # Check minimum uptime thresholds (warn, crit) - uses LOWER direction.
+        # The rule is SimpleLevels: ("fixed", (warn, crit)) or ("no_levels", None).
         min_uptime = params.get('min_uptime')
-        if min_uptime is not None and uptime is not None:
-            warn_threshold, crit_threshold = min_uptime
+        if (isinstance(min_uptime, tuple) and len(min_uptime) == 2
+                and min_uptime[0] == "fixed" and uptime is not None):
+            warn_threshold, crit_threshold = min_uptime[1]
             if crit_threshold and uptime < crit_threshold:
                 yield Result(
                     state=State.CRIT,

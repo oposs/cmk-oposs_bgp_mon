@@ -149,36 +149,35 @@ FLAPPED = dict(CISCO_UP, uptime=30)
 SETTLING = dict(CISCO_UP, uptime=300)
 
 
-@pytest.mark.xfail(strict=True, raises=TypeError,
-                   reason="BUG: min_uptime unpacks the SimpleLevels tuple as (warn, crit); any rule crashes the check")
 def test_min_uptime_crit_below_crit_level(check):
     out = _check(check, "AS65001 10.0.0.2", {"min_uptime": ("fixed", (600.0, 60.0))}, [_row(**FLAPPED)])
-    assert _worst(out) is State.CRIT
+    assert _results(out)[-1] == Result(
+        state=State.CRIT, summary="state: Established (uptime 30s < 60s critical threshold)")
 
 
-@pytest.mark.xfail(strict=True, raises=TypeError,
-                   reason="BUG: min_uptime unpacks the SimpleLevels tuple as (warn, crit); any rule crashes the check")
 def test_min_uptime_warn_below_warn_level(check):
     out = _check(check, "AS65001 10.0.0.2", {"min_uptime": ("fixed", (600.0, 60.0))}, [_row(**SETTLING)])
-    assert _worst(out) is State.WARN
+    assert _results(out)[-1] == Result(
+        state=State.WARN, summary="state: Established (uptime 300s < 600s warning threshold)")
 
 
-@pytest.mark.xfail(strict=True, raises=TypeError,
-                   reason="BUG: min_uptime unpacks the SimpleLevels tuple as (warn, crit); any rule crashes the check")
 def test_min_uptime_ok_above_levels(check):
     out = _check(check, "AS65001 10.0.0.2", {"min_uptime": ("fixed", (600.0, 60.0))})
     assert _worst(out) is State.OK
 
 
-@pytest.mark.xfail(strict=True, raises=TypeError,
-                   reason="BUG: min_uptime unpacks the SimpleLevels tuple as (warn, crit); 'no levels' crashes the check")
 def test_min_uptime_no_levels_is_ok(check):
     out = _check(check, "AS65001 10.0.0.2", {"min_uptime": ("no_levels", None)}, [_row(**FLAPPED)])
     assert _worst(out) is State.OK
 
 
+def test_min_uptime_crit_level_zero_is_off(check):
+    # The rule form prefills (60 s, 0 s): no critical level
+    out = _check(check, "AS65001 10.0.0.2", {"min_uptime": ("fixed", (60.0, 0.0))}, [_row(**FLAPPED)])
+    assert _worst(out) is State.WARN
+
+
 def test_min_uptime_ignored_for_idle_session(check):
-    # Never reaches the levels, so the bug above does not hit this path
     out = _check(check, "AS65002 10.0.0.3", {"min_uptime": ("fixed", (600.0, 60.0))})
     assert _worst(out) is State.CRIT
 
@@ -223,8 +222,6 @@ def test_parse_error_service_ok_once_errors_are_gone(check):
 
 
 @pytest.mark.parametrize("line", ["null", "[1, 2]", '"text"', "42"])
-@pytest.mark.xfail(strict=True, raises=TypeError,
-                   reason="BUG: a row that is valid JSON but not an object raises TypeError, which parse does not catch")
 def test_json_that_is_not_an_object_is_a_parse_error(check, line):
     section = check.parse_oposs_bgp_mon_sessions([_row(**CISCO_UP), [line]])
     assert section.inventory == ["AS65001 10.0.0.2"]
