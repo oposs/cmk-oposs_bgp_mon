@@ -15,8 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A BGP session outside the default VRF gets " VRF <name>" in its service
   name, for example "BGP AS65001 10.0.0.2 VRF blue". Before, the same peer in
   two VRFs shared one "BGP AS65001 10.0.0.2" service, which showed only one of
-  the sessions. Run a service discovery: the old services of such sessions
-  vanish and the new ones appear.
+  the sessions, so the other could go down without an alert. Run a service
+  discovery: the old services of all sessions outside the default VRF vanish
+  with their uptime graphs, and the new ones appear.
 - The package now requires Checkmk 2.4.0p1 or later. On Checkmk 2.3 the
   BGP session check never loaded, so its services could not be discovered
   or checked there.
