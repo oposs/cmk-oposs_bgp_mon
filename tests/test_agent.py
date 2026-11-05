@@ -176,14 +176,11 @@ def test_cisco_garbage_raises_value_error(agent, monkeypatch):
 
 
 # NX-API returns a table with a single row as an object, not a one-element
-# list. The agent handles that for ROW_neighbor, but not for ROW_vrf or ROW_af,
-# so a switch with one BGP VRF fails with "Got invalid data from host".
+# list, at every level.
 SINGLE = _nxapi(_nxapi_vrf("default", {"af-id": "1", "TABLE_saf": {"ROW_saf": _nxapi_saf(
     "IPv4 Unicast", _nxapi_neighbor("10.0.0.2", "65001", "Established", "PT1H"))}}))
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="BUG: a single ROW_vrf or ROW_af comes as an object; the agent indexes its keys and fails the fetch")
 def test_cisco_single_vrf_and_af(agent, monkeypatch):
     monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(SINGLE)))
     sessions = agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()
@@ -354,17 +351,24 @@ def test_huawei_no_peers(agent):
     assert _huawei_postprocess(agent, "Info: No peer.\n") == []
 
 
-@pytest.mark.xfail(strict=True, raises=UnicodeEncodeError,
-                   reason="BUG: the debug log line base64-encodes the output as ASCII on every run; any non-ASCII byte fails the fetch")
 def test_huawei_non_ascii_output(agent):
     text = HUAWEI.replace("Type: EBGP link", "Peer's description: \"Zürich POP\"\n         Type: EBGP link")
     assert len(_huawei_postprocess(agent, text)) == 3
 
 
-@pytest.mark.xfail(strict=True, raises=ImportError,
-                   reason="BUG: huaweiFetcher imports pexpect in its class body, so without pexpect no driver can run")
-def test_cisco_runs_without_pexpect():
-    _load_agent({"pexpect": None})
+def test_cisco_runs_without_pexpect(monkeypatch, capsys):
+    agent = _load_agent({"pexpect": None})
+    monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(NXAPI)))
+    code, lines = _run_main(agent, ["-u", "u", "-p", "p", "-r", "cisco_https", "router1"], capsys)
+    assert code == 0
+    assert len(lines) == 4
+
+
+def test_huawei_without_pexpect_says_what_to_install(monkeypatch):
+    agent = _load_agent()
+    monkeypatch.setitem(sys.modules, "pexpect", None)
+    with pytest.raises(ImportError, match="pip3 install pexpect"):
+        agent.huaweiFetcher(_args(agent, "huawei")).fetch()
 
 
 # --- main: what Checkmk reads ---------------------------------------------------

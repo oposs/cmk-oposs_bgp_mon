@@ -25,6 +25,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text, which contradicted them.
 
 ### Fixed
+- With "Minimum uptime after recovery" set in the rule "OPOSS BGP Monitor
+  Sessions Parameters", also to "No levels", every established "BGP AS..."
+  service went UNKNOWN with a crash report. These services now go WARN or CRIT
+  while the session has been up for less than the levels, and OK after that.
+- On a Cisco Nexus switch with BGP in only one VRF, or only one address
+  family in a VRF, the special agent failed with "Got invalid data from host"
+  and no "BGP AS..." service was found. These sessions are now discovered and
+  checked.
+- On a Checkmk site without the Python module pexpect, the special agent
+  failed for Cisco and Palo Alto devices too, with "The 'pexpect' library is
+  required for Huawei devices but is not installed." Only the Huawei driver
+  needs pexpect now.
+- On a Huawei switch whose BGP output held a character outside ASCII, for
+  example an umlaut in a peer description, the special agent failed with "Got
+  invalid data from host" and none of its "BGP AS..." services was checked.
+  Such output is now read.
+- An agent output line that was valid JSON but not a session record made the
+  whole section fail, so every "BGP AS..." service of the host went UNKNOWN
+  with a crash report. Such a line now counts as a parse error, reported in
+  the service "BGP _parse_errors", and the other sessions are checked.
 
 ## 1.1.3 - 2026-04-27
 ### Changed
