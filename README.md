@@ -63,8 +63,8 @@ cmk -II your-router-hostname
 ```
 
 This will create one service per BGP session in the format:
-- **Service name**: `BGP AS{asn} {neighbor-ip}`
-- **Example**: `BGP AS65001 10.0.0.1`
+- **Service name**: `BGP AS{asn} {neighbor-ip}`, and `BGP AS{asn} {neighbor-ip} VRF {vrf}` outside the default VRF
+- **Example**: `BGP AS65001 10.0.0.1`, `BGP AS65001 10.0.0.1 VRF blue`
 
 ## Monitoring States
 
