@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The special agent carries the release version in `__version__`.
 
 ### Changed
+- A BGP session outside the default VRF gets " VRF <name>" in its service
+  name, for example "BGP AS65001 10.0.0.2 VRF blue". Before, the same peer in
+  two VRFs shared one "BGP AS65001 10.0.0.2" service, which showed only one of
+  the sessions, so the other could go down without an alert. Run a service
+  discovery: the old services of all sessions outside the default VRF vanish
+  with their uptime graphs, and the new ones appear.
 - Palo Alto sessions are named after the remote AS and the peer address,
   for example "BGP AS65010 198.51.100.1" instead of
   "BGP AS198.51.100.1:179 ISP", and their "neighbouras" and "neighbourid"

@@ -20,7 +20,7 @@ from cmk.ccc import debug
 
 # Create release PR writes the released version here (version_files in
 # .github/repo-infra.json)
-__version__ = "unreleased"
+__version__ = "1.1.3"
 
 Section = Mapping[str, Any]
 
@@ -43,6 +43,12 @@ def parse_oposs_bgp_mon_sessions(string_table: list[list[str]]) -> Section:
         try:
             data = json.loads(row[0])
             service = 'AS' + data['neighbouras'] + ' ' + data['neighbourid']
+            # The same peer can sit in several VRFs. Sessions in the default
+            # VRF keep the old item; "????" is what the Huawei driver writes
+            # for the global instance.
+            vrf = data.get('vrf-name-out')
+            if vrf not in (None, '', 'default', '????'):
+                service += ' VRF ' + vrf
             parsed.inventory.append(service)
             parsed.result[service] = data
         except (json.JSONDecodeError, KeyError, IndexError, TypeError) as e:
@@ -58,8 +64,9 @@ def parse_oposs_bgp_mon_sessions(string_table: list[list[str]]) -> Section:
 def discover_sessions(section: Section) -> DiscoveryResult:
     """Discover one service per BGP session.
 
-    Service names follow the format: AS{as_number} {neighbor_id}
-    Example: AS65001 10.0.0.1
+    Service names follow the format: AS{as_number} {neighbor_id}, with
+    " VRF {vrf}" appended outside the default VRF
+    Example: AS65001 10.0.0.1, AS65001 10.0.0.1 VRF blue
 
     If there are parsing errors, a special error service is created.
     """
