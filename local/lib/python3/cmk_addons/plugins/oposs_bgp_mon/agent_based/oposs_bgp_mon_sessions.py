@@ -20,7 +20,7 @@ from cmk.ccc import debug
 
 # Create release PR writes the released version here (version_files in
 # .github/repo-infra.json)
-__version__ = "unreleased"
+__version__ = "1.1.3"
 
 Section = Mapping[str, Any]
 
