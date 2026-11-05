@@ -284,8 +284,15 @@ class paloaltoFetcher:
                 LOGGER.debug("No <prefix-counter> found in:\n%s",ET.tostring(entry,encoding="unicode"))
             else:
                 af_name = prefix_entry.get('afi-safi')
-                neighbourid = entry.find('peer-group').text # not peer-router-id since this seems to be ip4 always
-                neighbouras = entry.find('peer-address').text
+                # not peer-router-id since this seems to be ip4 always.
+                # <peer-address> carries the TCP port: 198.51.100.1:179,
+                # [2001:db8::1]:179
+                neighbourid = entry.find('peer-address').text
+                if neighbourid.startswith('['):
+                    neighbourid = neighbourid[1:].split(']', 1)[0]
+                elif neighbourid.count(':') == 1:
+                    neighbourid = neighbourid.split(':', 1)[0]
+                neighbouras = entry.find('remote-as').text
                 state = entry.find('status').text
                 uptime = entry.find('status-duration').text
 

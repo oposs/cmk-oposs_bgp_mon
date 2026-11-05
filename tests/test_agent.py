@@ -260,11 +260,25 @@ def test_paloalto_skips_peer_without_prefix_counter(agent, paloalto):
     assert session["uptime"] == 86400
 
 
-@pytest.mark.xfail(strict=True,
-                   reason="BUG: neighbouras is filled from <peer-address> and neighbourid from <peer-group>, not <remote-as>/the peer")
-def test_paloalto_reports_remote_as(agent, paloalto):
+def test_paloalto_reports_remote_as_and_peer_address(agent, paloalto):
     (session,) = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
     assert session["neighbouras"] == "65010"
+    assert session["neighbourid"] == "198.51.100.1"
+
+
+@pytest.mark.parametrize("address, expected", [
+    ("198.51.100.1:179", "198.51.100.1"),
+    ("198.51.100.1", "198.51.100.1"),
+    ("[2001:db8::1]:179", "2001:db8::1"),
+    ("2001:db8::1", "2001:db8::1"),
+])
+def test_paloalto_peer_address_without_port(agent, monkeypatch, address, expected):
+    peers = PAN_PEERS.replace("<peer-address>198.51.100.1:179</peer-address>",
+                              f"<peer-address>{address}</peer-address>")
+    monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(
+        PAN_KEYGEN if params["type"] == "keygen" else peers))
+    (session,) = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert session["neighbourid"] == expected
 
 
 def test_paloalto_failed_keygen(agent, monkeypatch):
