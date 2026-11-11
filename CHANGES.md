@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with "af-name: n/a". Before, such a peer had no "BGP ..." service, or its
   service went UNKNOWN with "Session ... not found in agent output". Run a
   service discovery to get services for the peers that are down now.
+- With `--debug` or `-vv`, the special agent no longer writes the full
+  output of a Huawei device to the log, as base64 or as text. It logs the
+  matched BGP peer blocks and the size of the output.
 
 ### Fixed
 - The special agent gives up on a Cisco or Palo Alto device that does not

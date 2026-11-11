@@ -6,6 +6,7 @@ PAN-OS XML API for Palo Alto, and `display bgp ... peer verbose` text read
 over SSH for Huawei. No network or SSH is used; requests is patched.
 """
 
+import base64
 import importlib.util
 import json
 import os
@@ -414,6 +415,48 @@ def test_huawei_no_peers(agent):
 def test_huawei_non_ascii_output(agent):
     text = HUAWEI.replace("Type: EBGP link", "Peer's description: \"Zürich POP\"\n         Type: EBGP link")
     assert len(_huawei_postprocess(agent, text)) == 3
+
+
+# "BGP current event" follows the state line, outside every peer block
+NOT_BGP = "KATimerExpired"
+
+
+def test_huawei_debug_log_has_no_full_dump(agent, caplog):
+    caplog.set_level("DEBUG")
+    assert len(_huawei_postprocess(agent, HUAWEI)) == 3
+    logged = "\n".join(caplog.messages)
+    assert NOT_BGP not in logged
+    assert base64.encodebytes(HUAWEI.encode()).decode().splitlines()[0] not in logged
+    # The peer blocks are what debugging needs
+    assert "BGP Peer is 10.2.2.3,  remote AS 65022" in logged
+
+
+def test_huawei_parse_failure_logs_no_full_dump(agent, monkeypatch, caplog):
+    caplog.set_level("DEBUG")
+
+    class Child:
+        before = ""
+
+        def expect(self, patterns, timeout):
+            if patterns == ["---- More ----", "<.+?>"]:
+                self.before = HUAWEI
+                return 1
+            return 1 if isinstance(patterns, list) and len(patterns) == 2 else 0
+
+        def sendline(self, line):
+            pass
+
+    pexpect = types.ModuleType("pexpect")
+    pexpect.spawn = lambda cmd, **kw: Child()
+    monkeypatch.setitem(sys.modules, "pexpect", pexpect)
+
+    def broken(self, data):
+        raise IndexError("no such group")
+
+    monkeypatch.setattr(agent.huaweiFetcher, "_huaweiFetcher__postprocess", broken)
+    with pytest.raises(ValueError, match="invalid data"):
+        agent.huaweiFetcher(_args(agent, "huawei")).fetch()
+    assert NOT_BGP not in "\n".join(caplog.messages)
 
 
 def test_cisco_runs_without_pexpect(monkeypatch, capsys):

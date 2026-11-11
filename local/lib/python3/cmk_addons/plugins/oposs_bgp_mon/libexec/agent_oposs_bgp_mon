@@ -14,7 +14,6 @@ import logging
 import sys
 import traceback
 import json
-import base64
 import urllib3
 urllib3.disable_warnings()
 import requests
@@ -374,8 +373,8 @@ class huaweiFetcher:
             LOGGER.debug("Sending output to postprocessing")
             return self.__postprocess(output)
         except:
-            LOGGER.debug("failed to parse output")
-            LOGGER.debug("response : %s", output)
+            # Not the output itself: it holds more than the BGP peers
+            LOGGER.debug("failed to parse output (%i bytes)", len(output))
             raise ValueError("Got invalid data from host")
 
 
@@ -409,7 +408,6 @@ class huaweiFetcher:
 
     def __postprocess(self, data):
         LOGGER.debug("Got data for postprocessing (%i bytes)", len(data))
-        LOGGER.debug("DATA ============================\n%s", base64.encodebytes(data.encode('utf-8')).decode('utf-8'))
         result = []
         pattern = r"""
             (family\sfor\sVPN\sinstance:\s+(?P<vrf_name_out>\S+))?\s+
