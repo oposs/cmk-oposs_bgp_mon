@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sessions. Before, the special agent stopped with "Error: Got invalid data
   from host" and no "BGP ..." service of the device got data. The peer that
   was never up shows its state without an uptime.
+- The uptime graph of a "BGP ..." service has the title "BGP session uptime"
+  and shows its values as time spans. Before, the metric was not declared,
+  so the graph had no proper title and showed plain numbers.
 
 ## 1.2.0 - 2026-11-06
 ### New

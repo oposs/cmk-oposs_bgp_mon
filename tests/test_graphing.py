@@ -5,7 +5,7 @@ import pathlib
 import sys
 
 import pytest
-from cmk.graphing.v1 import translations
+from cmk.graphing.v1 import metrics, translations
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PLUGIN = ROOT / "local/lib/python3/cmk_addons/plugins/oposs_bgp_mon"
@@ -32,3 +32,9 @@ def test_old_uptime_metric_translates_to_the_emitted_name(graphing_objects):
     assert translation.check_commands == [translations.PassiveCheck("oposs_bgp_mon_sessions")]
     # The name test_check.py sees the check emit
     assert translation.translations == {"uptime": translations.RenameTo("oposs_bgp_mon_uptime")}
+
+
+def test_uptime_metric_is_declared(graphing_objects):
+    found = [o for o in graphing_objects if isinstance(o, metrics.Metric)]
+    assert [m.name for m in found] == ["oposs_bgp_mon_uptime"]
+    assert found[0].unit == metrics.Unit(metrics.TimeNotation())
