@@ -268,18 +268,31 @@ def test_paloalto_insecure(agent, paloalto):
     assert all(kw["verify"] is False for _, _, kw in paloalto)
 
 
-def test_paloalto_skips_peer_without_prefix_counter(agent, paloalto):
+def test_paloalto_parses_peers(agent, paloalto):
     sessions = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
-    assert len(sessions) == 1
-    session = sessions[0]
-    assert session["vrf-name-out"] == "default"
-    assert session["af-name"] == "bgpAfiIpv4-unicast"
-    assert session["state"] == "Established"
-    assert session["uptime"] == 86400
+    assert sessions == [
+        {"vrf-name-out": "default", "af-name": "bgpAfiIpv4-unicast",
+         "neighbourid": "198.51.100.1", "neighbouras": "65010",
+         "state": "Established", "uptime": 86400},
+        # A peer that is not up has no <prefix-counter>, so no address family
+        {"vrf-name-out": "default", "af-name": None,
+         "neighbourid": "203.0.113.1", "neighbouras": "65011",
+         "state": "Active", "uptime": 120},
+    ]
+
+
+def test_paloalto_empty_prefix_counter(agent, monkeypatch):
+    peers = PAN_PEERS.replace("<local-address>203.0.113.2</local-address>",
+                              "<local-address>203.0.113.2</local-address><prefix-counter/>")
+    monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(
+        PAN_KEYGEN if params["type"] == "keygen" else peers))
+    sessions = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert [(s["neighbourid"], s["af-name"]) for s in sessions] == [
+        ("198.51.100.1", "bgpAfiIpv4-unicast"), ("203.0.113.1", None)]
 
 
 def test_paloalto_reports_remote_as_and_peer_address(agent, paloalto):
-    (session,) = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    session = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()[0]
     assert session["neighbouras"] == "65010"
     assert session["neighbourid"] == "198.51.100.1"
 
@@ -295,7 +308,7 @@ def test_paloalto_peer_address_without_port(agent, monkeypatch, address, expecte
                               f"<peer-address>{address}</peer-address>")
     monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(
         PAN_KEYGEN if params["type"] == "keygen" else peers))
-    (session,) = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    session = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()[0]
     assert session["neighbourid"] == expected
 
 
@@ -412,7 +425,7 @@ def test_cisco_host_named_test_asks_the_device(agent, monkeypatch, no_local_file
 
 
 def test_paloalto_host_named_test_asks_the_device(agent, paloalto, no_local_files):
-    assert len(agent.paloaltoFetcher(_args(agent, "paloalto", "test")).fetch()) == 1
+    assert len(agent.paloaltoFetcher(_args(agent, "paloalto", "test")).fetch()) == 2
     assert [url for url, _, _ in paloalto] == ["https://test/api/"] * 2
 
 

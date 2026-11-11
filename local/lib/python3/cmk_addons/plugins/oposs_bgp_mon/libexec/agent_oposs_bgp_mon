@@ -271,31 +271,30 @@ class paloaltoFetcher:
         result = []
         for entry in root.findall('./result/entry'):
             vrf_name_out = entry.get('vr')
+            # A peer that is not up has no address family negotiated, so
+            # no <prefix-counter> entry. It is kept, to report its state.
             prefix_entry = entry.find('./prefix-counter/entry')
-            if prefix_entry is None:
-                LOGGER.debug("No <prefix-counter> found in:\n%s",ET.tostring(entry,encoding="unicode"))
-            else:
-                af_name = prefix_entry.get('afi-safi')
-                # not peer-router-id since this seems to be ip4 always.
-                # <peer-address> carries the TCP port: 198.51.100.1:179,
-                # [2001:db8::1]:179
-                neighbourid = entry.find('peer-address').text
-                if neighbourid.startswith('['):
-                    neighbourid = neighbourid[1:].split(']', 1)[0]
-                elif neighbourid.count(':') == 1:
-                    neighbourid = neighbourid.split(':', 1)[0]
-                neighbouras = entry.find('remote-as').text
-                state = entry.find('status').text
-                uptime = entry.find('status-duration').text
+            af_name = None if prefix_entry is None else prefix_entry.get('afi-safi')
+            # not peer-router-id since this seems to be ip4 always.
+            # <peer-address> carries the TCP port: 198.51.100.1:179,
+            # [2001:db8::1]:179
+            neighbourid = entry.find('peer-address').text
+            if neighbourid.startswith('['):
+                neighbourid = neighbourid[1:].split(']', 1)[0]
+            elif neighbourid.count(':') == 1:
+                neighbourid = neighbourid.split(':', 1)[0]
+            neighbouras = entry.find('remote-as').text
+            state = entry.find('status').text
+            uptime = entry.find('status-duration').text
 
-                result.append({
-                    'vrf-name-out': vrf_name_out,
-                    'af-name': af_name,
-                    'neighbourid': neighbourid,
-                    'neighbouras': neighbouras,
-                    'state': state,
-                    'uptime': int(uptime),
-                })
+            result.append({
+                'vrf-name-out': vrf_name_out,
+                'af-name': af_name,
+                'neighbourid': neighbourid,
+                'neighbouras': neighbouras,
+                'state': state,
+                'uptime': int(uptime),
+            })
         return result
 
 class huaweiFetcher:

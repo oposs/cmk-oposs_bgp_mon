@@ -123,6 +123,26 @@ def test_other_state_is_warn_and_null_uptime_gives_no_metric(check):
     assert _metrics(out) == []
 
 
+# A Palo Alto peer that is not up has no address family
+PALOALTO_ACTIVE = dict(**{"vrf-name-out": "default", "af-name": None},
+                       neighbourid="203.0.113.1", neighbouras="65011", state="Active", uptime=120)
+
+
+def test_session_without_address_family(check):
+    table = STRING_TABLE + [_row(**PALOALTO_ACTIVE)]
+    section = check.parse_oposs_bgp_mon_sessions(table)
+    assert Service(item="AS65011 203.0.113.1") in list(check.discover_sessions(section))
+    out = _check(check, "AS65011 203.0.113.1", table=table)
+    assert [r.summary for r in _results(out)] == [
+        "vrf-name-out: default",
+        "af-name: n/a",
+        "neighbourid: 203.0.113.1",
+        "neighbouras: 65011",
+        "state: Active",
+    ]
+    assert _worst(out) is State.WARN
+
+
 def test_state_match_ignores_case(check):
     table = [_row(**dict(CISCO_UP, state="ESTABLISHED")), _row(**dict(CISCO_IDLE, state="idle"))]
     assert _worst(_check(check, "AS65001 10.0.0.2", table=table)) is State.OK
