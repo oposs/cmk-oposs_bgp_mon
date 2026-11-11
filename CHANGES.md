@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- A device with the host address "test" is now asked for its BGP sessions
+  like any other. Before, the special agent read them from a file under
+  `/tmp` on the Checkmk server, and a Huawei device of that name always failed
+  with "No such file or directory".
+- A Cisco device with a BGP peer that was never up now reports all its BGP
+  sessions. Before, the special agent stopped with "Error: Got invalid data
+  from host" and no "BGP ..." service of the device got data. The peer that
+  was never up shows its state without an uptime.
+- The uptime graph of a "BGP ..." service has the title "BGP session uptime"
+  and shows its values as time spans. Before, the metric was not declared,
+  so the graph had no proper title and showed plain numbers.
 
 ## 1.2.0 - 2026-11-06
 ### New

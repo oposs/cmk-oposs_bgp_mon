@@ -8,6 +8,7 @@ over SSH for Huawei. No network or SSH is used; requests is patched.
 
 import importlib.util
 import json
+import os
 import pathlib
 import re
 import sys
@@ -185,6 +186,23 @@ def test_cisco_single_vrf_and_af(agent, monkeypatch):
     monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(SINGLE)))
     sessions = agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()
     assert [s["neighbourid"] for s in sessions] == ["10.0.0.2"]
+
+
+# A peer that was never up has "never" as its session time
+NEVER_UP = _nxapi(_nxapi_vrf("default", {"af-id": "1", "TABLE_saf": {"ROW_saf": _nxapi_saf(
+    "IPv4 Unicast", [
+        _nxapi_neighbor("10.0.0.2", "65001", "Established", "PT1H"),
+        _nxapi_neighbor("10.0.0.5", "65005", "Idle", "never"),
+    ])}}))
+
+
+def test_cisco_peer_never_up(agent, monkeypatch):
+    monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(NEVER_UP)))
+    sessions = agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()
+    assert [(s["neighbourid"], s["state"]) for s in sessions] == [
+        ("10.0.0.2", "Established"), ("10.0.0.5", "Idle")]
+    assert abs(sessions[0]["uptime"] - 3600) <= DST
+    assert sessions[1]["uptime"] is None
 
 
 # --- Palo Alto XML API -------------------------------------------------------
@@ -369,6 +387,48 @@ def test_huawei_without_pexpect_says_what_to_install(monkeypatch):
     monkeypatch.setitem(sys.modules, "pexpect", None)
     with pytest.raises(ImportError, match="pip3 install pexpect"):
         agent.huaweiFetcher(_args(agent, "huawei")).fetch()
+
+
+# --- a device named "test" -----------------------------------------------------
+
+
+@pytest.fixture
+def no_local_files(agent, monkeypatch):
+    """Pretend every test data file exists, and fail if the agent opens one"""
+    monkeypatch.setattr(os, "access", lambda path, mode: True)
+
+    def no_open(*args, **kwargs):
+        raise AssertionError(f"agent opened a local file: {args[0]}")
+
+    monkeypatch.setattr(agent, "open", no_open, raising=False)
+
+
+def test_cisco_host_named_test_asks_the_device(agent, monkeypatch, no_local_files):
+    urls = []
+    monkeypatch.setattr(agent.requests, "post",
+                        lambda url, **kw: urls.append(url) or _Response(json.dumps(NXAPI)))
+    assert len(agent.ciscoFetcher("test", "u", "p", "cisco_https").fetch()) == 3
+    assert urls == ["https://test/ins"]
+
+
+def test_paloalto_host_named_test_asks_the_device(agent, paloalto, no_local_files):
+    assert len(agent.paloaltoFetcher(_args(agent, "paloalto", "test")).fetch()) == 1
+    assert [url for url, _, _ in paloalto] == ["https://test/api/"] * 2
+
+
+def test_huawei_host_named_test_asks_the_device(agent, monkeypatch, no_local_files):
+    spawned = []
+
+    class Child:
+        def expect(self, *args, **kwargs):
+            raise OSError("connection refused")
+
+    pexpect = types.ModuleType("pexpect")
+    pexpect.spawn = lambda cmd, **kw: spawned.append(cmd) or Child()
+    monkeypatch.setitem(sys.modules, "pexpect", pexpect)
+    with pytest.raises(RuntimeError, match="Failed to fetch data"):
+        agent.huaweiFetcher(_args(agent, "huawei", "test")).fetch()
+    assert spawned == ["ssh monitor@test"]
 
 
 # --- main: what Checkmk reads ---------------------------------------------------
