@@ -91,6 +91,9 @@ class ciscoFetcher:
 
         # Extract components from the duration string
         match = pattern.match(duration_str)
+        # A peer that was never up has "never"; it has no uptime
+        if match is None:
+            return None
         years, months, days, hours, minutes, seconds = map(int, match.groups(default=0))
 
         # Get the current date and time

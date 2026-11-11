@@ -188,6 +188,23 @@ def test_cisco_single_vrf_and_af(agent, monkeypatch):
     assert [s["neighbourid"] for s in sessions] == ["10.0.0.2"]
 
 
+# A peer that was never up has "never" as its session time
+NEVER_UP = _nxapi(_nxapi_vrf("default", {"af-id": "1", "TABLE_saf": {"ROW_saf": _nxapi_saf(
+    "IPv4 Unicast", [
+        _nxapi_neighbor("10.0.0.2", "65001", "Established", "PT1H"),
+        _nxapi_neighbor("10.0.0.5", "65005", "Idle", "never"),
+    ])}}))
+
+
+def test_cisco_peer_never_up(agent, monkeypatch):
+    monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(NEVER_UP)))
+    sessions = agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()
+    assert [(s["neighbourid"], s["state"]) for s in sessions] == [
+        ("10.0.0.2", "Established"), ("10.0.0.5", "Idle")]
+    assert abs(sessions[0]["uptime"] - 3600) <= DST
+    assert sessions[1]["uptime"] is None
+
+
 # --- Palo Alto XML API -------------------------------------------------------
 
 PAN_KEYGEN = '<response status="success"><result><key>LUFRPT1abc==</key></result></response>'

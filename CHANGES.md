@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   like any other. Before, the special agent read them from a file under
   `/tmp` on the Checkmk server, and a Huawei device of that name always failed
   with "No such file or directory".
+- A Cisco device with a BGP peer that was never up now reports all its BGP
+  sessions. Before, the special agent stopped with "Error: Got invalid data
+  from host" and no "BGP ..." service of the device got data. The peer that
+  was never up shows its state without an uptime.
 
 ## 1.2.0 - 2026-11-06
 ### New
