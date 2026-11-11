@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- The device password of an "OPOSS BGP Monitor" rule no longer shows in
+  plain text in the process list (`ps`) or in the configuration Checkmk
+  generates for its core. The special agent now gets a reference into the
+  Checkmk password store instead, both for a password typed into the rule
+  and for one picked from the store, and existing rules need no editing.
+  Until the changes are activated after the update, the agent gets the
+  password as before.
 
 ## 1.3.0 - 2026-11-11
 ### Changed

@@ -107,8 +107,21 @@ def _command(ssc, **params):
 
 def test_command_with_verification(ssc):
     assert _command(ssc, verify_ssl=True) == [
-        "-u", "monitor", "-p", PASSWORD.unsafe(), "-r", "cisco_https", "router1.example.net",
+        "-u", "monitor", "--password-ref", PASSWORD, "-r", "cisco_https", "router1.example.net",
     ]
+
+
+def test_password_is_passed_by_reference(ssc):
+    """Checkmk 2.4 turns a stored and an explicit password from the rule into
+    the same Secret (cmk/server_side_calls_backend/config_processing.py). Only
+    pass_safely=True makes it pass "<id>:<file>" rather than the password
+    (cmk/server_side_calls_backend/_commons.py)."""
+    args = _command(ssc, driver="huawei", verify_ssl=False)
+    (secret,) = [a for a in args if isinstance(a, Secret)]
+    assert secret == PASSWORD
+    assert secret.pass_safely is True
+    assert args[args.index(secret) - 1] == "--password-ref"
+    assert "-p" not in args
 
 
 def test_command_without_verification(ssc):
