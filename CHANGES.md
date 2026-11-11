@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
+
+### Fixed
+
+## 1.3.0 - 2026-11-11
+### Changed
 - A Palo Alto BGP peer that is not up now shows WARN or CRIT for its state,
   with "af-name: n/a". Before, such a peer had no "BGP ..." service, or its
   service went UNKNOWN with "Session ... not found in agent output". Run a
