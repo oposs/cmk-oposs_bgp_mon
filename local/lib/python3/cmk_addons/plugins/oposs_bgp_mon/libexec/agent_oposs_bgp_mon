@@ -385,8 +385,11 @@ class huaweiFetcher:
             output += self.__more("display bgp vpnv6 all peer verbose")
             child.sendline("exit")
         except:
-            LOGGER.debug("failed to read data: %s", str(self._child))
-            raise RuntimeError("Failed to fetch data "+str(self._child))
+            # Only the type: str() of the session, and of the pexpect
+            # exceptions, carries the last output of the device
+            reason = sys.exc_info()[0].__name__
+            LOGGER.debug("failed to read data: %s", reason)
+            raise RuntimeError("Failed to fetch data from %s: %s" % (self._host, reason)) from None
 
         try:
             LOGGER.debug("Sending output to postprocessing")

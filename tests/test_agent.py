@@ -514,6 +514,37 @@ def test_huawei_parse_failure_logs_no_full_dump(agent, monkeypatch, caplog):
     assert NOT_BGP not in "\n".join(caplog.messages)
 
 
+def test_huawei_ssh_failure_message_has_no_session_buffer(agent, monkeypatch, caplog, capsys):
+    caplog.set_level("DEBUG")
+    buffer = "<switch1>display current-configuration"
+
+    class TIMEOUT(Exception):
+        pass
+
+    class Child:
+        def __str__(self):
+            return f"<pexpect.pty_spawn.spawn object>\nbuffer (last 100 chars): {buffer!r}"
+
+        def expect(self, *args, **kwargs):
+            # pexpect puts str(child) into the text of its exceptions
+            raise TIMEOUT(f"Timeout exceeded.\n{self}")
+
+    pexpect = types.ModuleType("pexpect")
+    pexpect.spawn = lambda cmd, **kw: Child()
+    monkeypatch.setitem(sys.modules, "pexpect", pexpect)
+    with pytest.raises(RuntimeError) as error:
+        agent.huaweiFetcher(_args(agent, "huawei")).fetch()
+    assert str(error.value) == "Failed to fetch data from router1: TIMEOUT"
+    assert "current-configuration" not in "\n".join(caplog.messages)
+    # main prints the traceback into the section; a chained exception would
+    # bring the pexpect text back
+    code, lines = _run_main(agent, ["-u", "monitor", "-p", "secret", "-r", "huawei", "router1"],
+                            capsys)
+    assert code == 1
+    assert lines[-1] == "Error: Failed to fetch data from router1: TIMEOUT"
+    assert "current-configuration" not in "\n".join(lines)
+
+
 def test_cisco_runs_without_pexpect(monkeypatch, capsys):
     agent = _load_agent({"pexpect": None})
     monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(NXAPI)))

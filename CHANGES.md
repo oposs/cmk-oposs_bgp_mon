@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `--debug` or `-vv`, the special agent no longer writes the Palo Alto
   API key or the password of the key request to the log. It logs that a key
   was received.
+- When the SSH session to a Huawei device fails, the special agent reports
+  a short error such as "Error: Failed to fetch data from switch1: TIMEOUT".
+  Before, the error carried the internal state of the session, with the last
+  output of the device.
 - The special agent gives up on a Cisco or Palo Alto device that does not
   answer within 30 seconds and reports an error. Before, it kept waiting
   for the answer.
