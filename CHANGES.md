@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- A device with the host address "test" is now asked for its BGP sessions
+  like any other. Before, the special agent read them from a file under
+  `/tmp` on the Checkmk server, and a Huawei device of that name always failed
+  with "No such file or directory".
 
 ## 1.2.0 - 2026-11-06
 ### New

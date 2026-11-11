@@ -13,7 +13,6 @@ import argparse
 import logging
 import sys
 import traceback
-import os
 import json
 import base64
 import urllib3
@@ -114,11 +113,6 @@ class ciscoFetcher:
         return difference
 
     def fetch(self):
-        # if host is test and file is readable
-        if self._host == "test" and os.access("/tmp/cisco_bgp_data.json", os.R_OK):
-            with open("/tmp/cisco_bgp_data.json") as f:
-                return self.__postprocess(json.load(f))
-
         response = requests.post(
             self._endpoint,
             headers=self._headers,
@@ -208,11 +202,6 @@ class paloaltoFetcher:
         self._verbose = args.verbose
 
     def fetch(self):
-        # if host is test and file is readable
-        if self._host == "test" and os.access("/tmp/paloalto_bgp_data.xml", os.R_OK):
-            with open("/tmp/paloalto_bgp_data.xml") as f:
-                return self.__postprocess(f.read())
-
         kg_response = requests.get(self._endpoint, {
                 'type': "keygen",
                 'user': self._username,
@@ -332,9 +321,6 @@ class huaweiFetcher:
         return re.sub(r"^.*\x1b\[42D","",output,flags=re.MULTILINE)
 
     def fetch(self):
-        if self._host == "test":
-            with open("/tmp/huawei_bgp_data.txt",'r',encoding='utf-8') as f:
-                return self.__postprocess(f.read())
         # make sure to run
         #  pip3 install pexpect
         # in the checkmk instance where this plugin is installed.
