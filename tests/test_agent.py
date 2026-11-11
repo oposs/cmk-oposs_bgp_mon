@@ -332,6 +332,14 @@ def test_paloalto_failed_keygen(agent, monkeypatch):
         agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
 
 
+def test_paloalto_keygen_without_key_logs_the_answer(agent, monkeypatch, caplog):
+    answer = '<response status="success"><result/></response>'
+    monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(answer))
+    with pytest.raises(ValueError, match="no auth key"):
+        agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert f"Failed to extract key from: {answer}" in caplog.messages
+
+
 def test_paloalto_error_answer(agent, monkeypatch):
     monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(
         PAN_KEYGEN if params["type"] == "keygen" else '<response status="error"/>'))

@@ -268,7 +268,7 @@ class paloaltoFetcher:
             LOGGER.debug("Got auth key: %s",key_element.text)
             return key_element.text
 
-        LOGGER.warning("Failed to extract key from: %s");
+        LOGGER.warning("Failed to extract key from: %s", xml)
         raise ValueError("Got no auth key")
 
     def __postprocess(self, xml):
