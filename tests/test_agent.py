@@ -29,6 +29,10 @@ CHECK = PLUGIN / "agent_based/oposs_bgp_mon_sessions.py"
 DST = 3600
 
 
+def _no_lookup(pw_file, pw_id):
+    raise AssertionError("tests that use --password-ref patch the lookup")
+
+
 def _load_agent(extra_modules=None, path=AGENT):
     """Load the agent with the one monolith module it needs stubbed.
 
@@ -36,7 +40,7 @@ def _load_agent(extra_modules=None, path=AGENT):
     put in sys.modules for the import only.
     """
     password_store = types.ModuleType("cmk.utils.password_store")
-    password_store.replace_passwords = lambda: None
+    password_store.lookup = _no_lookup
     stubs = {"cmk.utils.password_store": password_store, **(extra_modules or {})}
     if "cmk.utils" not in sys.modules:
         utils = types.ModuleType("cmk.utils")
@@ -663,3 +667,94 @@ def test_release_writes_version_into_agent(tmp_path):
     copy = tmp_path / "agent_oposs_bgp_mon"
     copy.write_text(stamped)
     assert _load_agent(path=copy).__version__ == "9.8.7"
+
+
+# --- password store ------------------------------------------------------------
+
+# What Checkmk 2.4 puts in place of a Secret passed safely:
+# f"{secret_name}:{password_store_file}" (cmk/server_side_calls_backend/_commons.py)
+STORE = "/omd/sites/mon/var/check_mk/core/helper_config/42/stored_passwords"
+
+
+@pytest.fixture
+def store(agent, monkeypatch):
+    """A password store with one entry per id, as lookup() reads it"""
+    passwords = {"bgp_switches": "s3cret:with:colons", "uuid0d8e": "explicit"}
+    calls = []
+
+    def lookup(pw_file, pw_id):
+        calls.append((pw_file, pw_id))
+        try:
+            return passwords[pw_id]
+        except KeyError:
+            raise ValueError(f"Password '{pw_id}' not found in {pw_file}") from None
+
+    monkeypatch.setattr(agent.password_store, "lookup", lookup)
+    return calls
+
+
+@pytest.mark.parametrize("pw_id, password", [
+    ("bgp_switches", "s3cret:with:colons"),  # from the password store
+    ("uuid0d8e", "explicit"),  # typed into the rule
+])
+def test_password_ref_reads_the_store(agent, store, pw_id, password):
+    args = agent.parse_arguments(["-u", "monitor", "--password-ref", f"{pw_id}:{STORE}",
+                                  "-r", "paloalto", "fw1"])
+    assert args.password is None
+    assert agent.resolve_password(args) == password
+    assert store == [(pathlib.Path(STORE), pw_id)]
+
+
+def test_password_ref_with_colon_in_the_id(agent, store):
+    args = agent.parse_arguments(["-u", "m", "--password-ref", f":uuid:0d8e:{STORE}",
+                                  "-r", "huawei", "sw1"])
+    with pytest.raises(ValueError):
+        agent.resolve_password(args)
+    assert store == [(pathlib.Path(STORE), ":uuid:0d8e")]
+
+
+def test_plain_password_still_works(agent, store):
+    """A core config generated before the update still passes -p"""
+    assert agent.resolve_password(_args(agent, "cisco_https")) == "secret"
+    assert store == []
+
+
+@pytest.mark.parametrize("argv", [
+    ["-u", "m", "-r", "huawei", "sw1"],
+    ["-u", "m", "-p", "p", "--password-ref", f"x:{STORE}", "-r", "huawei", "sw1"],
+])
+def test_exactly_one_password_option(agent, argv, capsys):
+    with pytest.raises(SystemExit):
+        agent.parse_arguments(argv)
+
+
+def test_main_resolves_password_ref(agent, store, monkeypatch, capsys):
+    sent = []
+
+    def post(url, **kw):
+        sent.append(kw["auth"])
+        return _Response(json.dumps(NXAPI))
+
+    monkeypatch.setattr(agent.requests, "post", post)
+    code, lines = _run_main(agent, ["-u", "monitor", "--password-ref", f"bgp_switches:{STORE}",
+                                    "-r", "cisco_https", "router1"], capsys)
+    assert code == 0
+    assert len(lines) == 4
+    assert sent == [("monitor", "s3cret:with:colons")]
+
+
+def test_main_missing_password_reaches_the_check(agent, check, store, capsys):
+    code, lines = _run_main(agent, ["-u", "m", "--password-ref", f"gone:{STORE}",
+                                    "-r", "cisco_https", "router1"], capsys)
+    assert code == 1
+    assert lines[0] == "<<<oposs_bgp_mon_sessions:sep(0)>>>"
+    assert lines[-1] == f"Error: Password 'gone' not found in {STORE}"
+    assert check.parse_oposs_bgp_mon_sessions([[line] for line in lines[1:]]).inventory == []
+
+
+def test_main_malformed_password_ref(agent, store, capsys):
+    code, lines = _run_main(agent, ["-u", "m", "--password-ref", "nofile",
+                                    "-r", "cisco_https", "router1"], capsys)
+    assert code == 1
+    assert lines[-1] == "Error: --password-ref needs PW_ID:PW_FILE"
+    assert store == []

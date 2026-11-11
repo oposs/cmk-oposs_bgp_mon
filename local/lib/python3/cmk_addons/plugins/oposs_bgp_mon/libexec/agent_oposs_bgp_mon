@@ -17,7 +17,8 @@ import json
 import urllib3
 urllib3.disable_warnings()
 import requests
-from cmk.utils.password_store import replace_passwords
+from cmk.utils import password_store
+from pathlib import Path
 from pprint import pprint
 import re
 from datetime import datetime, timedelta
@@ -31,9 +32,13 @@ def parse_arguments(argv):
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument("-u", "--username", required=True, type=str, help="user name")
-    parser.add_argument(
-        "-p", "--password", required=True, type=str, help="user password"
+    secret = parser.add_mutually_exclusive_group(required=True)
+    secret.add_argument(
+        "--password-ref",
+        metavar="PW_ID:PW_FILE",
+        help="password store entry and file holding the user password",
     )
+    secret.add_argument("-p", "--password", type=str, help="user password")
     parser.add_argument(
         "-r", "--driver", required=True, type=str, help="communication driver name"
     )
@@ -459,11 +464,27 @@ class huaweiFetcher:
         LOGGER.debug("Returning postprocessed data")
         return result
 
+def resolve_password(args):
+    """The password from -p, or looked up in the password store.
+
+    Checkmk passes --password-ref as "<password id>:<password file>".
+    Split at the last colon: the file is a path below the site, which has
+    no colon, while Checkmk once wrote password ids as ":uuid:<uuid>"
+    (cmk/utils/password_store/_pwstore.py, CMK-16660).
+    """
+    if args.password_ref is None:
+        return args.password
+    pw_id, sep, pw_file = args.password_ref.rpartition(":")
+    if not sep or not pw_id or not pw_file:
+        raise ValueError("--password-ref needs PW_ID:PW_FILE")
+    return password_store.lookup(Path(pw_file), pw_id)
+
+
 def main(argv=None):
-    replace_passwords()
     args = parse_arguments(argv or sys.argv[1:])
     sys.stdout.write("<<<oposs_bgp_mon_sessions:sep(0)>>>\n")
     try:
+        args.password = resolve_password(args)
         if args.driver == "cisco_http" or args.driver == "cisco_https":
             for session in ciscoFetcher(
                 args.hostaddress, args.username, args.password, args.driver,

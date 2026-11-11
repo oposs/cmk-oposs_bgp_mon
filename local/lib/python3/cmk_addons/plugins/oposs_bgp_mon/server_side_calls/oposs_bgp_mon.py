@@ -35,11 +35,16 @@ def generate_oposs_bgp_mon_command(
     Yields:
         SpecialAgentCommand with appropriate command line arguments
     """
-    args = [
+    # With .unsafe() the password stood in plain text on the command line,
+    # readable in ps and in the generated core config. Passed as is, Checkmk
+    # hands the agent "<password id>:<password file>" instead. An explicit
+    # password from the rule is written to that file as well
+    # (collect_passwords in cmk/base/config.py, Checkmk 2.4).
+    args: list[str | Secret] = [
         "-u",
         params.username,
-        "-p",
-        params.password.unsafe(),
+        "--password-ref",
+        params.password,
         "-r",
         params.driver,
     ]
