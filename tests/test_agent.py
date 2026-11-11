@@ -6,8 +6,10 @@ PAN-OS XML API for Palo Alto, and `display bgp ... peer verbose` text read
 over SSH for Huawei. No network or SSH is used; requests is patched.
 """
 
+import base64
 import importlib.util
 import json
+import logging
 import os
 import pathlib
 import re
@@ -164,6 +166,22 @@ def test_cisco_insecure_turns_off_verification(agent, monkeypatch):
     assert seen["verify"] is False
 
 
+def test_cisco_request_has_a_timeout(agent, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(agent.requests, "post",
+                        lambda url, **kw: seen.update(kw) or _Response(json.dumps(NXAPI)))
+    agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()
+    assert seen["timeout"] == 30
+
+
+def test_cisco_sends_json_rpc_content_type(agent, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(agent.requests, "post",
+                        lambda url, **kw: seen.update(kw) or _Response(json.dumps(NXAPI)))
+    agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()
+    assert seen["headers"] == {"content-type": "application/json-rpc"}
+
+
 def test_cisco_http_error_raises(agent, monkeypatch):
     monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response("denied", 401))
     with pytest.raises(RuntimeError, match="Failed to fetch data"):
@@ -268,18 +286,69 @@ def test_paloalto_insecure(agent, paloalto):
     assert all(kw["verify"] is False for _, _, kw in paloalto)
 
 
-def test_paloalto_skips_peer_without_prefix_counter(agent, paloalto):
+def test_paloalto_parses_peers(agent, paloalto):
     sessions = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
-    assert len(sessions) == 1
-    session = sessions[0]
-    assert session["vrf-name-out"] == "default"
-    assert session["af-name"] == "bgpAfiIpv4-unicast"
-    assert session["state"] == "Established"
-    assert session["uptime"] == 86400
+    assert sessions == [
+        {"vrf-name-out": "default", "af-name": "bgpAfiIpv4-unicast",
+         "neighbourid": "198.51.100.1", "neighbouras": "65010",
+         "state": "Established", "uptime": 86400},
+        # A peer that is not up has no <prefix-counter>, so no address family
+        {"vrf-name-out": "default", "af-name": None,
+         "neighbourid": "203.0.113.1", "neighbouras": "65011",
+         "state": "Active", "uptime": 120},
+    ]
+
+
+def test_paloalto_empty_prefix_counter(agent, monkeypatch):
+    peers = PAN_PEERS.replace("<local-address>203.0.113.2</local-address>",
+                              "<local-address>203.0.113.2</local-address><prefix-counter/>")
+    monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(
+        PAN_KEYGEN if params["type"] == "keygen" else peers))
+    sessions = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert [(s["neighbourid"], s["af-name"]) for s in sessions] == [
+        ("198.51.100.1", "bgpAfiIpv4-unicast"), ("203.0.113.1", None)]
+
+
+def _pan_peer(name, body):
+    return f'<entry peer="{name}" vr="default"><peer-group>ISP</peer-group>{body}</entry>'
+
+
+# Peers that are not up, with elements missing or empty
+PAN_SPARSE = PAN_PEERS.replace("</result>", "".join([
+    _pan_peer("noduration", "<remote-as>65012</remote-as><status>Idle</status>"
+              "<peer-address>203.0.113.5</peer-address>"),
+    _pan_peer("emptyduration", "<remote-as>65013</remote-as><status>Connect</status>"
+              "<status-duration/><peer-address>203.0.113.6</peer-address>"),
+    _pan_peer("nostatus", "<remote-as>65014</remote-as><status-duration>5</status-duration>"
+              "<peer-address>203.0.113.7</peer-address>"),
+    # Without the remote AS or the peer address there is no service name
+    _pan_peer("noas", "<status>Idle</status><peer-address>203.0.113.8</peer-address>"),
+    _pan_peer("noaddress", "<remote-as>65016</remote-as><status>Idle</status>"
+              "<peer-address></peer-address>"),
+]) + "</result>")
+
+
+def test_paloalto_peers_with_missing_elements(agent, check, monkeypatch):
+    monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(
+        PAN_KEYGEN if params["type"] == "keygen" else PAN_SPARSE))
+    sessions = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert [(s["neighbourid"], s.get("state"), s["uptime"]) for s in sessions] == [
+        ("198.51.100.1", "Established", 86400),
+        ("203.0.113.1", "Active", 120),
+        ("203.0.113.5", "Idle", None),
+        ("203.0.113.6", "Connect", None),
+        ("203.0.113.7", None, 5),
+    ]
+    # Every session reaches the check without a parse error
+    rows = [[json.dumps(s, sort_keys=True, separators=(",", ":"))] for s in sessions]
+    section = check.parse_oposs_bgp_mon_sessions(rows)
+    assert section.errors == []
+    out = list(check.check_oposs_bgp_mon_sessions("AS65014 203.0.113.7", {}, section))
+    assert out[-1] == check.Result(state=check.State.WARN, summary="state: n/a")
 
 
 def test_paloalto_reports_remote_as_and_peer_address(agent, paloalto):
-    (session,) = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    session = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()[0]
     assert session["neighbouras"] == "65010"
     assert session["neighbourid"] == "198.51.100.1"
 
@@ -295,8 +364,29 @@ def test_paloalto_peer_address_without_port(agent, monkeypatch, address, expecte
                               f"<peer-address>{address}</peer-address>")
     monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(
         PAN_KEYGEN if params["type"] == "keygen" else peers))
-    (session,) = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    session = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()[0]
     assert session["neighbourid"] == expected
+
+
+def test_paloalto_requests_have_a_timeout(agent, paloalto):
+    agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert [kw["timeout"] for _, _, kw in paloalto] == [30, 30]
+
+
+def test_paloalto_debug_log_has_no_key(agent, paloalto, caplog):
+    caplog.set_level("DEBUG")
+    agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert "LUFRPT1abc==" not in "\n".join(caplog.messages)
+    assert "Received an auth key" in caplog.messages
+
+
+def test_debug_mode_keeps_urllib3_quiet(agent, monkeypatch):
+    """urllib3 logs each request line with its query string at debug
+    level, which holds the password of the keygen and the key"""
+    monkeypatch.setattr(logging.getLogger("urllib3"), "level", logging.NOTSET)
+    agent.parse_arguments(["-d", "-u", "u", "-p", "p", "-r", "paloalto", "fw1"])
+    # basicConfig does nothing under pytest, so check the logger's own level
+    assert logging.getLogger("urllib3").level > logging.DEBUG
 
 
 def test_paloalto_failed_keygen(agent, monkeypatch):
@@ -304,6 +394,14 @@ def test_paloalto_failed_keygen(agent, monkeypatch):
         '<response status="error"><result><msg>Invalid credentials.</msg></result></response>'))
     with pytest.raises(ValueError, match="no auth key"):
         agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+
+
+def test_paloalto_keygen_without_key_logs_the_answer(agent, monkeypatch, caplog):
+    answer = '<response status="success"><result/></response>'
+    monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(answer))
+    with pytest.raises(ValueError, match="no auth key"):
+        agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert f"Failed to extract key from: {answer}" in caplog.messages
 
 
 def test_paloalto_error_answer(agent, monkeypatch):
@@ -374,6 +472,79 @@ def test_huawei_non_ascii_output(agent):
     assert len(_huawei_postprocess(agent, text)) == 3
 
 
+# "BGP current event" follows the state line, outside every peer block
+NOT_BGP = "KATimerExpired"
+
+
+def test_huawei_debug_log_has_no_full_dump(agent, caplog):
+    caplog.set_level("DEBUG")
+    assert len(_huawei_postprocess(agent, HUAWEI)) == 3
+    logged = "\n".join(caplog.messages)
+    assert NOT_BGP not in logged
+    assert base64.encodebytes(HUAWEI.encode()).decode().splitlines()[0] not in logged
+    # The peer blocks are what debugging needs
+    assert "BGP Peer is 10.2.2.3,  remote AS 65022" in logged
+
+
+def test_huawei_parse_failure_logs_no_full_dump(agent, monkeypatch, caplog):
+    caplog.set_level("DEBUG")
+
+    class Child:
+        before = ""
+
+        def expect(self, patterns, timeout):
+            if patterns == ["---- More ----", "<.+?>"]:
+                self.before = HUAWEI
+                return 1
+            return 1 if isinstance(patterns, list) and len(patterns) == 2 else 0
+
+        def sendline(self, line):
+            pass
+
+    pexpect = types.ModuleType("pexpect")
+    pexpect.spawn = lambda cmd, **kw: Child()
+    monkeypatch.setitem(sys.modules, "pexpect", pexpect)
+
+    def broken(self, data):
+        raise IndexError("no such group")
+
+    monkeypatch.setattr(agent.huaweiFetcher, "_huaweiFetcher__postprocess", broken)
+    with pytest.raises(ValueError, match="invalid data"):
+        agent.huaweiFetcher(_args(agent, "huawei")).fetch()
+    assert NOT_BGP not in "\n".join(caplog.messages)
+
+
+def test_huawei_ssh_failure_message_has_no_session_buffer(agent, monkeypatch, caplog, capsys):
+    caplog.set_level("DEBUG")
+    buffer = "<switch1>display current-configuration"
+
+    class TIMEOUT(Exception):
+        pass
+
+    class Child:
+        def __str__(self):
+            return f"<pexpect.pty_spawn.spawn object>\nbuffer (last 100 chars): {buffer!r}"
+
+        def expect(self, *args, **kwargs):
+            # pexpect puts str(child) into the text of its exceptions
+            raise TIMEOUT(f"Timeout exceeded.\n{self}")
+
+    pexpect = types.ModuleType("pexpect")
+    pexpect.spawn = lambda cmd, **kw: Child()
+    monkeypatch.setitem(sys.modules, "pexpect", pexpect)
+    with pytest.raises(RuntimeError) as error:
+        agent.huaweiFetcher(_args(agent, "huawei")).fetch()
+    assert str(error.value) == "Failed to fetch data from router1: TIMEOUT"
+    assert "current-configuration" not in "\n".join(caplog.messages)
+    # main prints the traceback into the section; a chained exception would
+    # bring the pexpect text back
+    code, lines = _run_main(agent, ["-u", "monitor", "-p", "secret", "-r", "huawei", "router1"],
+                            capsys)
+    assert code == 1
+    assert lines[-1] == "Error: Failed to fetch data from router1: TIMEOUT"
+    assert "current-configuration" not in "\n".join(lines)
+
+
 def test_cisco_runs_without_pexpect(monkeypatch, capsys):
     agent = _load_agent({"pexpect": None})
     monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response(json.dumps(NXAPI)))
@@ -412,7 +583,7 @@ def test_cisco_host_named_test_asks_the_device(agent, monkeypatch, no_local_file
 
 
 def test_paloalto_host_named_test_asks_the_device(agent, paloalto, no_local_files):
-    assert len(agent.paloaltoFetcher(_args(agent, "paloalto", "test")).fetch()) == 1
+    assert len(agent.paloaltoFetcher(_args(agent, "paloalto", "test")).fetch()) == 2
     assert [url for url, _, _ in paloalto] == ["https://test/api/"] * 2
 
 

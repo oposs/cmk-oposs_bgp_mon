@@ -10,8 +10,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New
 
 ### Changed
+- A Palo Alto BGP peer that is not up now shows WARN or CRIT for its state,
+  with "af-name: n/a". Before, such a peer had no "BGP ..." service, or its
+  service went UNKNOWN with "Session ... not found in agent output". Run a
+  service discovery to get services for the peers that are down now.
+- With `--debug` or `-vv`, the special agent no longer writes the full
+  output of a Huawei device to the log, as base64 or as text. It logs the
+  matched BGP peer blocks and the size of the output.
 
 ### Fixed
+- With `--debug` or `-vv`, the special agent no longer writes the Palo Alto
+  API key or the password of the key request to the log. It logs that a key
+  was received.
+- When the SSH session to a Huawei device fails, the special agent reports
+  a short error such as "Error: Failed to fetch data from switch1: TIMEOUT".
+  Before, the error carried the internal state of the session, with the last
+  output of the device.
+- The special agent gives up on a Cisco or Palo Alto device that does not
+  answer within 30 seconds and reports an error. Before, it kept waiting
+  for the answer.
+- When a Palo Alto device answers the key request without a key, the special
+  agent warning "Failed to extract key from:" now shows the answer of the
+  device instead of a literal "%s".
 - A device with the host address "test" is now asked for its BGP sessions
   like any other. Before, the special agent read them from a file under
   `/tmp` on the Checkmk server, and a Huawei device of that name always failed

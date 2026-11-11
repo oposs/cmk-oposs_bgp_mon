@@ -14,7 +14,6 @@ import logging
 import sys
 import traceback
 import json
-import base64
 import urllib3
 urllib3.disable_warnings()
 import requests
@@ -71,11 +70,18 @@ def parse_arguments(argv):
         lvl = logging.DEBUG
 
     logging.basicConfig(level=lvl, format=fmt)
+    # urllib3 logs each request line with its query string at debug level.
+    # For Palo Alto that holds the password of the keygen and the API key.
+    logging.getLogger("urllib3").setLevel(max(lvl, logging.INFO))
 
     return args
 
 
 class ciscoFetcher:
+    # Seconds to wait for the connection and for each read of the answer,
+    # so a device that does not answer cannot stall the special agent
+    timeout = 30
+
     def __init__(self, hostaddress, username, password, driver, verify_ssl=True) -> None:  # type:ignore[no-untyped-def]
         self._username = username
         self._password = password
@@ -83,7 +89,7 @@ class ciscoFetcher:
         self._driver = driver
         self._verify_ssl = verify_ssl
         self._endpoint = ( "http://%s/ins" if driver == 'cisco_http' else "https://%s/ins" ) % self._host
-        self._headers = {"content-type": "application.json-rpc"}
+        self._headers = {"content-type": "application/json-rpc"}
 
     def __duration_string_to_seconds(self,duration_str):
         # Define a regular expression for extracting components
@@ -132,6 +138,7 @@ class ciscoFetcher:
                 }
             ),
             verify=self._verify_ssl,
+            timeout=self.timeout,
         )
 
         if response.status_code != 200:
@@ -195,6 +202,10 @@ class ciscoFetcher:
         return result
 
 class paloaltoFetcher:
+    # Seconds to wait for the connection and for each read of the answer,
+    # so a device that does not answer cannot stall the special agent
+    timeout = 30
+
     def __init__(self, args) -> None:  # type:ignore[no-untyped-def]
         self._username = args.username
         self._password = args.password
@@ -211,6 +222,7 @@ class paloaltoFetcher:
                 'password': self._password,
             },
             verify=self._verify_ssl,
+            timeout=self.timeout,
         )
 
         if kg_response.status_code != 200:
@@ -218,7 +230,8 @@ class paloaltoFetcher:
             LOGGER.warning("response : %s", kg_response.text)
             raise RuntimeError("Failed to fetch key")
         else:
-            LOGGER.debug("success! response: %s", kg_response.text)
+            # The answer holds the API key; do not log it
+            LOGGER.debug("success! keygen answer received")
 
         kg_key = self.__getKey(kg_response.text)
 
@@ -228,6 +241,7 @@ class paloaltoFetcher:
                 'cmd': "<show><routing><protocol><bgp><peer></peer></bgp></protocol></routing></show>",
             },
             verify=self._verify_ssl,
+            timeout=self.timeout,
         )
 
         if op_response.status_code != 200:
@@ -254,10 +268,10 @@ class paloaltoFetcher:
         # Find the 'key' element
         key_element = root.find('.//key')
         if key_element is not None:
-            LOGGER.debug("Got auth key: %s",key_element.text)
+            LOGGER.debug("Received an auth key")
             return key_element.text
 
-        LOGGER.warning("Failed to extract key from: %s");
+        LOGGER.warning("Failed to extract key from: %s", xml)
         raise ValueError("Got no auth key")
 
     def __postprocess(self, xml):
@@ -271,31 +285,45 @@ class paloaltoFetcher:
         result = []
         for entry in root.findall('./result/entry'):
             vrf_name_out = entry.get('vr')
+            # A peer that is not up has no address family negotiated, so
+            # no <prefix-counter> entry. It is kept, to report its state.
             prefix_entry = entry.find('./prefix-counter/entry')
-            if prefix_entry is None:
-                LOGGER.debug("No <prefix-counter> found in:\n%s",ET.tostring(entry,encoding="unicode"))
-            else:
-                af_name = prefix_entry.get('afi-safi')
-                # not peer-router-id since this seems to be ip4 always.
-                # <peer-address> carries the TCP port: 198.51.100.1:179,
-                # [2001:db8::1]:179
-                neighbourid = entry.find('peer-address').text
-                if neighbourid.startswith('['):
-                    neighbourid = neighbourid[1:].split(']', 1)[0]
-                elif neighbourid.count(':') == 1:
-                    neighbourid = neighbourid.split(':', 1)[0]
-                neighbouras = entry.find('remote-as').text
-                state = entry.find('status').text
-                uptime = entry.find('status-duration').text
+            af_name = None if prefix_entry is None else prefix_entry.get('afi-safi')
+            # A peer that is not up can lack elements or have empty ones
+            def text(tag):
+                element = entry.find(tag)
+                if element is None or element.text is None:
+                    return None
+                return element.text.strip() or None
 
-                result.append({
-                    'vrf-name-out': vrf_name_out,
-                    'af-name': af_name,
-                    'neighbourid': neighbourid,
-                    'neighbouras': neighbouras,
-                    'state': state,
-                    'uptime': int(uptime),
-                })
+            # not peer-router-id since this seems to be ip4 always.
+            # <peer-address> carries the TCP port: 198.51.100.1:179,
+            # [2001:db8::1]:179
+            neighbourid = text('peer-address')
+            neighbouras = text('remote-as')
+            if neighbourid is None or neighbouras is None:
+                # Without both there is no service name
+                LOGGER.debug("Skipping peer %s without remote AS or peer address",
+                             entry.get('peer'))
+                continue
+            if neighbourid.startswith('['):
+                neighbourid = neighbourid[1:].split(']', 1)[0]
+            elif neighbourid.count(':') == 1:
+                neighbourid = neighbourid.split(':', 1)[0]
+            uptime = text('status-duration')
+
+            session = {
+                'vrf-name-out': vrf_name_out,
+                'af-name': af_name,
+                'neighbourid': neighbourid,
+                'neighbouras': neighbouras,
+                'uptime': int(uptime) if uptime is not None and uptime.isdigit() else None,
+            }
+            # Without a status the check reports "state: n/a"
+            state = text('status')
+            if state is not None:
+                session['state'] = state
+            result.append(session)
         return result
 
 class huaweiFetcher:
@@ -357,15 +385,18 @@ class huaweiFetcher:
             output += self.__more("display bgp vpnv6 all peer verbose")
             child.sendline("exit")
         except:
-            LOGGER.debug("failed to read data: %s", str(self._child))
-            raise RuntimeError("Failed to fetch data "+str(self._child))
+            # Only the type: str() of the session, and of the pexpect
+            # exceptions, carries the last output of the device
+            reason = sys.exc_info()[0].__name__
+            LOGGER.debug("failed to read data: %s", reason)
+            raise RuntimeError("Failed to fetch data from %s: %s" % (self._host, reason)) from None
 
         try:
             LOGGER.debug("Sending output to postprocessing")
             return self.__postprocess(output)
         except:
-            LOGGER.debug("failed to parse output")
-            LOGGER.debug("response : %s", output)
+            # Not the output itself: it holds more than the BGP peers
+            LOGGER.debug("failed to parse output (%i bytes)", len(output))
             raise ValueError("Got invalid data from host")
 
 
@@ -399,7 +430,6 @@ class huaweiFetcher:
 
     def __postprocess(self, data):
         LOGGER.debug("Got data for postprocessing (%i bytes)", len(data))
-        LOGGER.debug("DATA ============================\n%s", base64.encodebytes(data.encode('utf-8')).decode('utf-8'))
         result = []
         pattern = r"""
             (family\sfor\sVPN\sinstance:\s+(?P<vrf_name_out>\S+))?\s+

@@ -125,7 +125,8 @@ def check_oposs_bgp_mon_sessions(item: Any, params: Mapping[str, Any], section: 
     # Report informational fields
     session_status = result.get("state", "").lower()
     for key in ['vrf-name-out', 'af-name', 'neighbourid', 'neighbouras']:
-        yield Result(state=State.OK, summary=f"{key}: {result.get(key, 'n/a')}")
+        value = result.get(key)
+        yield Result(state=State.OK, summary=f"{key}: {'n/a' if value is None else value}")
 
     # Report uptime metric (if available)
     if "uptime" in result and result["uptime"] is not None:
