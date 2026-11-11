@@ -70,6 +70,9 @@ def parse_arguments(argv):
         lvl = logging.DEBUG
 
     logging.basicConfig(level=lvl, format=fmt)
+    # urllib3 logs each request line with its query string at debug level.
+    # For Palo Alto that holds the password of the keygen and the API key.
+    logging.getLogger("urllib3").setLevel(max(lvl, logging.INFO))
 
     return args
 
@@ -227,7 +230,8 @@ class paloaltoFetcher:
             LOGGER.warning("response : %s", kg_response.text)
             raise RuntimeError("Failed to fetch key")
         else:
-            LOGGER.debug("success! response: %s", kg_response.text)
+            # The answer holds the API key; do not log it
+            LOGGER.debug("success! keygen answer received")
 
         kg_key = self.__getKey(kg_response.text)
 
@@ -264,7 +268,7 @@ class paloaltoFetcher:
         # Find the 'key' element
         key_element = root.find('.//key')
         if key_element is not None:
-            LOGGER.debug("Got auth key: %s",key_element.text)
+            LOGGER.debug("Received an auth key")
             return key_element.text
 
         LOGGER.warning("Failed to extract key from: %s", xml)

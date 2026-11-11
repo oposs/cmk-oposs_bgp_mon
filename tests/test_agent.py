@@ -9,6 +9,7 @@ over SSH for Huawei. No network or SSH is used; requests is patched.
 import base64
 import importlib.util
 import json
+import logging
 import os
 import pathlib
 import re
@@ -370,6 +371,22 @@ def test_paloalto_peer_address_without_port(agent, monkeypatch, address, expecte
 def test_paloalto_requests_have_a_timeout(agent, paloalto):
     agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
     assert [kw["timeout"] for _, _, kw in paloalto] == [30, 30]
+
+
+def test_paloalto_debug_log_has_no_key(agent, paloalto, caplog):
+    caplog.set_level("DEBUG")
+    agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert "LUFRPT1abc==" not in "\n".join(caplog.messages)
+    assert "Received an auth key" in caplog.messages
+
+
+def test_debug_mode_keeps_urllib3_quiet(agent, monkeypatch):
+    """urllib3 logs each request line with its query string at debug
+    level, which holds the password of the keygen and the key"""
+    monkeypatch.setattr(logging.getLogger("urllib3"), "level", logging.NOTSET)
+    agent.parse_arguments(["-d", "-u", "u", "-p", "p", "-r", "paloalto", "fw1"])
+    # basicConfig does nothing under pytest, so check the logger's own level
+    assert logging.getLogger("urllib3").level > logging.DEBUG
 
 
 def test_paloalto_failed_keygen(agent, monkeypatch):
