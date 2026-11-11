@@ -76,6 +76,10 @@ def parse_arguments(argv):
 
 
 class ciscoFetcher:
+    # Seconds to wait for the connection and for each read of the answer,
+    # so a device that does not answer cannot stall the special agent
+    timeout = 30
+
     def __init__(self, hostaddress, username, password, driver, verify_ssl=True) -> None:  # type:ignore[no-untyped-def]
         self._username = username
         self._password = password
@@ -132,6 +136,7 @@ class ciscoFetcher:
                 }
             ),
             verify=self._verify_ssl,
+            timeout=self.timeout,
         )
 
         if response.status_code != 200:
@@ -195,6 +200,10 @@ class ciscoFetcher:
         return result
 
 class paloaltoFetcher:
+    # Seconds to wait for the connection and for each read of the answer,
+    # so a device that does not answer cannot stall the special agent
+    timeout = 30
+
     def __init__(self, args) -> None:  # type:ignore[no-untyped-def]
         self._username = args.username
         self._password = args.password
@@ -211,6 +220,7 @@ class paloaltoFetcher:
                 'password': self._password,
             },
             verify=self._verify_ssl,
+            timeout=self.timeout,
         )
 
         if kg_response.status_code != 200:
@@ -228,6 +238,7 @@ class paloaltoFetcher:
                 'cmd': "<show><routing><protocol><bgp><peer></peer></bgp></protocol></routing></show>",
             },
             verify=self._verify_ssl,
+            timeout=self.timeout,
         )
 
         if op_response.status_code != 200:

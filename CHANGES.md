@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   service discovery to get services for the peers that are down now.
 
 ### Fixed
+- The special agent gives up on a Cisco or Palo Alto device that does not
+  answer within 30 seconds and reports an error. Before, it kept waiting
+  for the answer.
 - A device with the host address "test" is now asked for its BGP sessions
   like any other. Before, the special agent read them from a file under
   `/tmp` on the Checkmk server, and a Huawei device of that name always failed

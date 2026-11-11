@@ -164,6 +164,14 @@ def test_cisco_insecure_turns_off_verification(agent, monkeypatch):
     assert seen["verify"] is False
 
 
+def test_cisco_request_has_a_timeout(agent, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(agent.requests, "post",
+                        lambda url, **kw: seen.update(kw) or _Response(json.dumps(NXAPI)))
+    agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()
+    assert seen["timeout"] == 30
+
+
 def test_cisco_http_error_raises(agent, monkeypatch):
     monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response("denied", 401))
     with pytest.raises(RuntimeError, match="Failed to fetch data"):
@@ -310,6 +318,11 @@ def test_paloalto_peer_address_without_port(agent, monkeypatch, address, expecte
         PAN_KEYGEN if params["type"] == "keygen" else peers))
     session = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()[0]
     assert session["neighbourid"] == expected
+
+
+def test_paloalto_requests_have_a_timeout(agent, paloalto):
+    agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert [kw["timeout"] for _, _, kw in paloalto] == [30, 30]
 
 
 def test_paloalto_failed_keygen(agent, monkeypatch):
