@@ -87,7 +87,7 @@ class ciscoFetcher:
         self._driver = driver
         self._verify_ssl = verify_ssl
         self._endpoint = ( "http://%s/ins" if driver == 'cisco_http' else "https://%s/ins" ) % self._host
-        self._headers = {"content-type": "application.json-rpc"}
+        self._headers = {"content-type": "application/json-rpc"}
 
     def __duration_string_to_seconds(self,duration_str):
         # Define a regular expression for extracting components

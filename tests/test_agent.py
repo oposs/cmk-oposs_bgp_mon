@@ -172,6 +172,14 @@ def test_cisco_request_has_a_timeout(agent, monkeypatch):
     assert seen["timeout"] == 30
 
 
+def test_cisco_sends_json_rpc_content_type(agent, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(agent.requests, "post",
+                        lambda url, **kw: seen.update(kw) or _Response(json.dumps(NXAPI)))
+    agent.ciscoFetcher("router1", "u", "p", "cisco_https").fetch()
+    assert seen["headers"] == {"content-type": "application/json-rpc"}
+
+
 def test_cisco_http_error_raises(agent, monkeypatch):
     monkeypatch.setattr(agent.requests, "post", lambda url, **kw: _Response("denied", 401))
     with pytest.raises(RuntimeError, match="Failed to fetch data"):
