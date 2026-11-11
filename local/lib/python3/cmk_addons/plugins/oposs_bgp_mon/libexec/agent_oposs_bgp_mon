@@ -285,26 +285,41 @@ class paloaltoFetcher:
             # no <prefix-counter> entry. It is kept, to report its state.
             prefix_entry = entry.find('./prefix-counter/entry')
             af_name = None if prefix_entry is None else prefix_entry.get('afi-safi')
+            # A peer that is not up can lack elements or have empty ones
+            def text(tag):
+                element = entry.find(tag)
+                if element is None or element.text is None:
+                    return None
+                return element.text.strip() or None
+
             # not peer-router-id since this seems to be ip4 always.
             # <peer-address> carries the TCP port: 198.51.100.1:179,
             # [2001:db8::1]:179
-            neighbourid = entry.find('peer-address').text
+            neighbourid = text('peer-address')
+            neighbouras = text('remote-as')
+            if neighbourid is None or neighbouras is None:
+                # Without both there is no service name
+                LOGGER.debug("Skipping peer %s without remote AS or peer address",
+                             entry.get('peer'))
+                continue
             if neighbourid.startswith('['):
                 neighbourid = neighbourid[1:].split(']', 1)[0]
             elif neighbourid.count(':') == 1:
                 neighbourid = neighbourid.split(':', 1)[0]
-            neighbouras = entry.find('remote-as').text
-            state = entry.find('status').text
-            uptime = entry.find('status-duration').text
+            uptime = text('status-duration')
 
-            result.append({
+            session = {
                 'vrf-name-out': vrf_name_out,
                 'af-name': af_name,
                 'neighbourid': neighbourid,
                 'neighbouras': neighbouras,
-                'state': state,
-                'uptime': int(uptime),
-            })
+                'uptime': int(uptime) if uptime is not None and uptime.isdigit() else None,
+            }
+            # Without a status the check reports "state: n/a"
+            state = text('status')
+            if state is not None:
+                session['state'] = state
+            result.append(session)
         return result
 
 class huaweiFetcher:

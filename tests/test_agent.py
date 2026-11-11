@@ -308,6 +308,44 @@ def test_paloalto_empty_prefix_counter(agent, monkeypatch):
         ("198.51.100.1", "bgpAfiIpv4-unicast"), ("203.0.113.1", None)]
 
 
+def _pan_peer(name, body):
+    return f'<entry peer="{name}" vr="default"><peer-group>ISP</peer-group>{body}</entry>'
+
+
+# Peers that are not up, with elements missing or empty
+PAN_SPARSE = PAN_PEERS.replace("</result>", "".join([
+    _pan_peer("noduration", "<remote-as>65012</remote-as><status>Idle</status>"
+              "<peer-address>203.0.113.5</peer-address>"),
+    _pan_peer("emptyduration", "<remote-as>65013</remote-as><status>Connect</status>"
+              "<status-duration/><peer-address>203.0.113.6</peer-address>"),
+    _pan_peer("nostatus", "<remote-as>65014</remote-as><status-duration>5</status-duration>"
+              "<peer-address>203.0.113.7</peer-address>"),
+    # Without the remote AS or the peer address there is no service name
+    _pan_peer("noas", "<status>Idle</status><peer-address>203.0.113.8</peer-address>"),
+    _pan_peer("noaddress", "<remote-as>65016</remote-as><status>Idle</status>"
+              "<peer-address></peer-address>"),
+]) + "</result>")
+
+
+def test_paloalto_peers_with_missing_elements(agent, check, monkeypatch):
+    monkeypatch.setattr(agent.requests, "get", lambda url, params, **kw: _Response(
+        PAN_KEYGEN if params["type"] == "keygen" else PAN_SPARSE))
+    sessions = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()
+    assert [(s["neighbourid"], s.get("state"), s["uptime"]) for s in sessions] == [
+        ("198.51.100.1", "Established", 86400),
+        ("203.0.113.1", "Active", 120),
+        ("203.0.113.5", "Idle", None),
+        ("203.0.113.6", "Connect", None),
+        ("203.0.113.7", None, 5),
+    ]
+    # Every session reaches the check without a parse error
+    rows = [[json.dumps(s, sort_keys=True, separators=(",", ":"))] for s in sessions]
+    section = check.parse_oposs_bgp_mon_sessions(rows)
+    assert section.errors == []
+    out = list(check.check_oposs_bgp_mon_sessions("AS65014 203.0.113.7", {}, section))
+    assert out[-1] == check.Result(state=check.State.WARN, summary="state: n/a")
+
+
 def test_paloalto_reports_remote_as_and_peer_address(agent, paloalto):
     session = agent.paloaltoFetcher(_args(agent, "paloalto")).fetch()[0]
     assert session["neighbouras"] == "65010"
