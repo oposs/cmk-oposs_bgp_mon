@@ -372,8 +372,11 @@ class huaweiFetcher:
                 "Please install it by running: pip3 install pexpect\n"
                 "If you are using an OMD site, run this command within the site context."
             )
-        # Initiate SSH session
-        self._child = child = pexpect.spawn(f"ssh {self._username}@{self._host}", encoding='utf-8')
+        # Initiate SSH session. An args list, not one command string: pexpect
+        # splits a string on spaces, and a username or host that starts with
+        # "-" would become an ssh option. "--" ends the options.
+        self._child = child = pexpect.spawn(
+            "ssh", ["-l", self._username, "--", self._host], encoding='utf-8')
         password_prompt = ".*assword: "
         ssh_newkey = "Are you sure you want to continue connecting"
         output = ""
