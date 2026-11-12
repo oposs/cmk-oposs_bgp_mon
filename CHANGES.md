@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+
+## 1.3.2 - 2026-11-12
+### Fixed
 - For a Huawei device, a user name with a space in an "OPOSS BGP Monitor"
   rule no longer breaks the SSH login, and a user name or host address
   that starts with "-" is no longer read by ssh as one of its options.
