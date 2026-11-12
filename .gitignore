@@ -9,6 +9,7 @@
 !/tests
 !/pytest.ini
 !/requirements-dev.txt
+!/ruff.toml
 *~
 *.swp
 *.bak
