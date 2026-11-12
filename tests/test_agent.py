@@ -7,6 +7,7 @@ over SSH for Huawei. No network or SSH is used; requests is patched.
 """
 
 import base64
+import getopt
 import importlib.util
 import json
 import logging
@@ -506,7 +507,7 @@ def test_huawei_parse_failure_logs_no_full_dump(agent, monkeypatch, caplog):
             pass
 
     pexpect = types.ModuleType("pexpect")
-    pexpect.spawn = lambda cmd, **kw: Child()
+    pexpect.spawn = lambda cmd, args=None, **kw: Child()
     monkeypatch.setitem(sys.modules, "pexpect", pexpect)
 
     def broken(self, data):
@@ -534,7 +535,7 @@ def test_huawei_ssh_failure_message_has_no_session_buffer(agent, monkeypatch, ca
             raise TIMEOUT(f"Timeout exceeded.\n{self}")
 
     pexpect = types.ModuleType("pexpect")
-    pexpect.spawn = lambda cmd, **kw: Child()
+    pexpect.spawn = lambda cmd, args=None, **kw: Child()
     monkeypatch.setitem(sys.modules, "pexpect", pexpect)
     with pytest.raises(RuntimeError) as error:
         agent.huaweiFetcher(_args(agent, "huawei")).fetch()
@@ -599,11 +600,46 @@ def test_huawei_host_named_test_asks_the_device(agent, monkeypatch, no_local_fil
             raise OSError("connection refused")
 
     pexpect = types.ModuleType("pexpect")
-    pexpect.spawn = lambda cmd, **kw: spawned.append(cmd) or Child()
+    pexpect.spawn = lambda cmd, args=None, **kw: spawned.append([cmd, *args]) or Child()
     monkeypatch.setitem(sys.modules, "pexpect", pexpect)
     with pytest.raises(RuntimeError, match="Failed to fetch data"):
         agent.huaweiFetcher(_args(agent, "huawei", "test")).fetch()
-    assert spawned == ["ssh monitor@test"]
+    assert spawned == [["ssh", "-l", "monitor", "--", "test"]]
+
+
+# The option string of OpenSSH (ssh.c): an argument after -l or after "--"
+# can never become an option
+SSH_OPTSTRING = "1246ab:c:e:fgi:kl:m:no:p:qstvxAB:CD:E:F:GI:J:KL:MNO:P:Q:R:S:TVw:W:XYy"
+
+
+@pytest.mark.parametrize("username, host", [
+    ("monitor", "router1"),
+    ("net admin", "router1"),
+    ("-oProxyCommand=touch /pwned", "router1"),
+    ("monitor", "-oProxyCommand=touch /pwned"),
+    ("monitor", "router1 -oProxyCommand=touch"),
+])
+def test_huawei_ssh_gets_username_and_host_as_one_argument_each(agent, monkeypatch,
+                                                                username, host):
+    spawned = []
+
+    class Child:
+        def expect(self, *args, **kwargs):
+            raise OSError("connection refused")
+
+    pexpect = types.ModuleType("pexpect")
+    # pexpect.spawn splits a command string on spaces, unless args is given
+    pexpect.spawn = lambda cmd, args=None, **kw: spawned.append((cmd, args)) or Child()
+    monkeypatch.setitem(sys.modules, "pexpect", pexpect)
+    args = _args(agent, "huawei")
+    args.username, args.hostaddress = username, host
+    with pytest.raises(RuntimeError, match="Failed to fetch data"):
+        agent.huaweiFetcher(args).fetch()
+    [(cmd, argv)] = spawned
+    assert cmd == "ssh"
+    options, destination = getopt.getopt(argv, SSH_OPTSTRING)
+    assert options == [("-l", username)]
+    assert destination == [host]
 
 
 # --- main: what Checkmk reads ---------------------------------------------------

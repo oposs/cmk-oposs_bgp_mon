@@ -103,10 +103,16 @@ If you're upgrading from the old `bgp_mon` plugin, see **[MIGRATION_TO_V2.md](MI
 
 **Solution**:
 1. Check rule is applied to host: **Setup → Agents → VM, Cloud, Container → OETIKER+PARTNER BGP Monitor**
-2. Test special agent manually:
+2. Run the special agent with the settings of the rule, as the site user:
    ```bash
-   /omd/sites/SITE/local/lib/python3/cmk_addons/plugins/oposs_bgp_mon/libexec/agent_oposs_bgp_mon \
-     -u USERNAME -p PASSWORD -r DRIVER HOSTNAME
+   cmk -d HOSTNAME
+   ```
+   To call it directly, take the `--password-ref` value from the command
+   line that `cmk -D HOSTNAME` shows, so that no password is on the
+   command line:
+   ```bash
+   ~/local/lib/python3/cmk_addons/plugins/oposs_bgp_mon/libexec/agent_oposs_bgp_mon \
+     -u USERNAME --password-ref PW_ID:PW_FILE -r DRIVER -vv HOSTNAME
    ```
 
 ### SSL certificate errors

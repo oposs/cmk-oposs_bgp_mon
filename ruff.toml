@@ -1,0 +1,3 @@
+# The special agent has no .py suffix (Checkmk runs it by name), so ruff would
+# skip it without this.
+extend-include = ["local/lib/python3/cmk_addons/plugins/oposs_bgp_mon/libexec/agent_oposs_bgp_mon"]
